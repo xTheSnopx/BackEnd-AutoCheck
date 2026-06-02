@@ -49,15 +49,16 @@ namespace AutoCheckAML.Api.Web.Mapping
             CreateMap<CreateFormFieldRequest, FormField>();
             CreateMap<UpdateFormFieldRequest, FormField>();
 
-            // FormSubmission mappings
-            CreateMap<FormSubmissionRequest, FormSubmission>()
-                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            // FormSubmission mappings (nueva arquitectura)
+            CreateMap<FormSubmission, FormSubmissionDto>()
+                .ForMember(dest => dest.FormTemplateName, opt => opt.MapFrom(src => src.FormTemplate != null ? src.FormTemplate.Name : null))
+                .ForMember(dest => dest.SubmittedByUserName, opt => opt.MapFrom(src => src.SubmittedByUser != null ? src.SubmittedByUser.FullName : null))
+                .ForMember(dest => dest.AssignedToCrewName, opt => opt.MapFrom(src => src.AssignedToCrew != null ? src.AssignedToCrew.Name : null))
+                .ForMember(dest => dest.VerifiedByUserName, opt => opt.MapFrom(src => src.VerifiedByUser != null ? src.VerifiedByUser.FullName : null));
+            CreateMap<CreateFormSubmissionRequest, FormSubmission>()
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "Pendiente"))
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.SubmittedByUserId, opt => opt.Ignore())
-                .ForMember(dest => dest.SubmittedByUser, opt => opt.Ignore());
-
-            CreateMap<FormSubmission, FormSubmissionResponse>();
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+                .ForMember(dest => dest.Id, opt => opt.Ignore());
 
             // Answer mappings
             CreateMap<Answer, AnswerDto>()

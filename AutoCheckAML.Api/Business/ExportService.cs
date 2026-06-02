@@ -1,96 +1,102 @@
 using AutoCheckAML.Api.Entity;
+using AutoCheckAML.Api.Web.DTOs;
 using ClosedXML.Excel;
 
 namespace AutoCheckAML.Api.Business
 {
     public interface IExportService
     {
-        byte[] ExportToExcel(List<FormSubmission> forms, string fileName = "formularios");
+        byte[] ExportFormSubmissionsToExcel(List<FormSubmissionDto> submissions);
+        byte[] ExportUsersToExcel(List<UserDto> users);
     }
 
     public class ExportService : IExportService
     {
-        public byte[] ExportToExcel(List<FormSubmission> forms, string fileName = "formularios")
+        public byte[] ExportFormSubmissionsToExcel(List<FormSubmissionDto> submissions)
         {
-            try
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("Formularios");
+
+            // Headers
+            var headers = new[] { "ID", "Plantilla", "Respondido por", "Cuadrilla", "Ubicación", "Fecha Actividad", "Estado", "Verificado por", "Fecha Registro" };
+            for (int i = 0; i < headers.Length; i++)
+                ws.Cell(1, i + 1).Value = headers[i];
+
+            // Style headers
+            var headerRow = ws.Row(1);
+            headerRow.Style.Fill.BackgroundColor = XLColor.FromArgb(0x2E4057);
+            headerRow.Style.Font.FontColor = XLColor.White;
+            headerRow.Style.Font.Bold = true;
+            headerRow.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Data rows
+            int row = 2;
+            foreach (var s in submissions.OrderByDescending(f => f.CreatedAt))
             {
-                using (var workbook = new XLWorkbook())
-                {
-                    var worksheet = workbook.Worksheets.Add("Formularios");
+                ws.Cell(row, 1).Value = s.Id;
+                ws.Cell(row, 2).Value = s.FormTemplateName ?? "-";
+                ws.Cell(row, 3).Value = s.SubmittedByUserName ?? "-";
+                ws.Cell(row, 4).Value = s.AssignedToCrewName ?? "-";
+                ws.Cell(row, 5).Value = s.ActivityLocation ?? "-";
+                ws.Cell(row, 6).Value = s.ActivityDate.ToString("yyyy-MM-dd");
+                ws.Cell(row, 7).Value = s.Status;
+                ws.Cell(row, 8).Value = s.VerifiedByUserName ?? "-";
+                ws.Cell(row, 9).Value = s.CreatedAt.ToString("yyyy-MM-dd HH:mm");
 
-                    // Encabezados
-                    worksheet.Cell(1, 1).Value = "ID";
-                    worksheet.Cell(1, 2).Value = "Nombre";
-                    worksheet.Cell(1, 3).Value = "Email";
-                    worksheet.Cell(1, 4).Value = "Teléfono";
-                    worksheet.Cell(1, 5).Value = "Empresa";
-                    worksheet.Cell(1, 6).Value = "Asunto";
-                    worksheet.Cell(1, 7).Value = "Mensaje";
-                    worksheet.Cell(1, 8).Value = "Fecha";
-                    worksheet.Cell(1, 9).Value = "Estado";
-                    worksheet.Cell(1, 10).Value = "Fecha de Registro";
+                if (row % 2 == 0)
+                    ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromArgb(0xEBF0F8);
 
-                    // Aplicar estilos a encabezados
-                    var headerRow = worksheet.Row(1);
-                    headerRow.Style.Fill.BackgroundColor = XLColor.FromArgb(0x4472C4);
-                    headerRow.Style.Font.FontColor = XLColor.White;
-                    headerRow.Style.Font.Bold = true;
-                    headerRow.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                    headerRow.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-
-                    // Agregar datos
-                    int row = 2;
-                    foreach (var form in forms.OrderByDescending(f => f.CreatedAt))
-                    {
-                        worksheet.Cell(row, 1).Value = form.Id;
-                        worksheet.Cell(row, 2).Value = form.Nombre;
-                        worksheet.Cell(row, 3).Value = form.Email;
-                        worksheet.Cell(row, 4).Value = form.Telefono;
-                        worksheet.Cell(row, 5).Value = form.Empresa;
-                        worksheet.Cell(row, 6).Value = form.Asunto;
-                        worksheet.Cell(row, 7).Value = form.Mensaje;
-                        worksheet.Cell(row, 8).Value = form.Fecha.ToString("yyyy-MM-dd");
-                        worksheet.Cell(row, 9).Value = form.Status;
-                        worksheet.Cell(row, 10).Value = form.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss");
-
-                        // Aplicar estilos a filas de datos
-                        var dataRow = worksheet.Row(row);
-                        if (row % 2 == 0)
-                        {
-                            dataRow.Style.Fill.BackgroundColor = XLColor.FromArgb(0xEBF0F8);
-                        }
-                        dataRow.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
-                        dataRow.Style.Alignment.WrapText = true;
-
-                        row++;
-                    }
-
-                    // Ajustar ancho de columnas
-                    worksheet.Column(1).Width = 8;
-                    worksheet.Column(2).Width = 20;
-                    worksheet.Column(3).Width = 25;
-                    worksheet.Column(4).Width = 15;
-                    worksheet.Column(5).Width = 20;
-                    worksheet.Column(6).Width = 25;
-                    worksheet.Column(7).Width = 40;
-                    worksheet.Column(8).Width = 15;
-                    worksheet.Column(9).Width = 15;
-                    worksheet.Column(10).Width = 20;
-
-                    // Congelar encabezado
-                    worksheet.SheetView.FreezeRows(1);
-
-                    using (var stream = new MemoryStream())
-                    {
-                        workbook.SaveAs(stream);
-                        return stream.ToArray();
-                    }
-                }
+                row++;
             }
-            catch (Exception ex)
+
+            // Auto-fit columns
+            ws.Columns().AdjustToContents();
+            ws.SheetView.FreezeRows(1);
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
+
+        public byte[] ExportUsersToExcel(List<UserDto> users)
+        {
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("Usuarios");
+
+            var headers = new[] { "ID", "Usuario", "Email", "Nombre Completo", "Roles", "Cuadrilla", "Activo", "Último Login" };
+            for (int i = 0; i < headers.Length; i++)
+                ws.Cell(1, i + 1).Value = headers[i];
+
+            var headerRow = ws.Row(1);
+            headerRow.Style.Fill.BackgroundColor = XLColor.FromArgb(0x2E4057);
+            headerRow.Style.Font.FontColor = XLColor.White;
+            headerRow.Style.Font.Bold = true;
+            headerRow.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            int row = 2;
+            foreach (var u in users)
             {
-                throw new Exception($"Error al exportar a Excel: {ex.Message}");
+                ws.Cell(row, 1).Value = u.Id;
+                ws.Cell(row, 2).Value = u.Username;
+                ws.Cell(row, 3).Value = u.Email;
+                ws.Cell(row, 4).Value = u.FullName;
+                ws.Cell(row, 5).Value = string.Join(", ", u.Roles ?? new List<string>());
+                ws.Cell(row, 6).Value = u.CrewName ?? "-";
+                ws.Cell(row, 7).Value = u.IsActive ? "Sí" : "No";
+                ws.Cell(row, 8).Value = u.LastLogin?.ToString("yyyy-MM-dd HH:mm") ?? "-";
+
+                if (row % 2 == 0)
+                    ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromArgb(0xEBF0F8);
+
+                row++;
             }
+
+            ws.Columns().AdjustToContents();
+            ws.SheetView.FreezeRows(1);
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
     }
 }

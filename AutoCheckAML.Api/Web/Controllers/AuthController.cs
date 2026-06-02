@@ -1,6 +1,8 @@
 using AutoCheckAML.Api.Business;
 using AutoCheckAML.Api.Web.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace AutoCheckAML.Api.Web.Controllers
 {
@@ -23,18 +25,9 @@ namespace AutoCheckAML.Api.Web.Controllers
                 var response = await _authService.LoginAsync(request);
                 return Ok(response);
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
+            catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
         [HttpPost("register")]
@@ -45,18 +38,30 @@ namespace AutoCheckAML.Api.Web.Controllers
                 var response = await _authService.RegisterAsync(request);
                 return Ok(response);
             }
-            catch (ArgumentException ex)
+            catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("refresh")]
+        public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] string refreshToken)
+        {
+            try
             {
-                return BadRequest(new { message = ex.Message });
+                var response = await _authService.RefreshTokenAsync(refreshToken);
+                return Ok(response);
             }
-            catch (InvalidOperationException ex)
-            {
-                return Conflict(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout([FromBody] string refreshToken)
+        {
+            var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
+            await _authService.RevokeTokenAsync(userId, refreshToken);
+            return Ok(new { message = "Sesión cerrada exitosamente." });
         }
     }
 }

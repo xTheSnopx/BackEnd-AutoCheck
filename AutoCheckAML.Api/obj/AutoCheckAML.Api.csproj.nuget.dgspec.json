@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj": {}
+    "C:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj": {}
   },
   "projects": {
-    "c:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj": {
+    "C:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj",
+        "projectUniqueName": "C:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj",
         "projectName": "AutoCheckAML.Api",
-        "projectPath": "c:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj",
+        "projectPath": "C:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\AutoCheckAML.Api.csproj",
         "packagesPath": "C:\\Users\\XJuan\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\obj\\",
+        "outputPath": "C:\\Users\\XJuan\\source\\repos\\AutoCheckAML\\BackEnd-AutoCheck\\AutoCheckAML.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

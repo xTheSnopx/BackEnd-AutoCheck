@@ -1,5 +1,4 @@
 using AutoCheckAML.Api.Business;
-using AutoCheckAML.Api.Entity;
 using AutoCheckAML.Api.Web.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,164 +20,115 @@ namespace AutoCheckAML.Api.Web.Controllers
             _exportService = exportService;
         }
 
-        private int GetUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            return userIdClaim != null ? int.Parse(userIdClaim.Value) : 0;
-        }
+        private int GetUserId() =>
+            int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
-        [HttpPost("submit")]
-        public async Task<ActionResult<FormSubmissionResponse>> SubmitForm([FromBody] FormSubmissionRequest request)
-        {
-            try
-            {
-                var userId = GetUserId();
-                var response = await _formService.SubmitFormAsync(userId, request);
-                return Ok(response);
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
-        }
-
-        [HttpGet("all")]
-        public async Task<ActionResult<List<FormSubmissionResponse>>> GetAllForms()
+        /// <summary>Crear un nuevo FormSubmission respondiendo una plantilla.</summary>
+        [HttpPost]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        public async Task<ActionResult<FormSubmissionDto>> Create([FromBody] CreateFormSubmissionRequest request)
         {
             try
             {
-                var userId = GetUserId();
-                var forms = await _formService.GetAllFormSubmissionsAsync(userId);
-                return Ok(forms);
+                var result = await _formService.CreateSubmissionAsync(GetUserId(), request);
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        /// <summary>Obtener formularios con filtros paginados.</summary>
+        [HttpGet]
+        public async Task<ActionResult<PagedResult<FormSubmissionDto>>> GetAll([FromQuery] FormSubmissionFilterRequest filter)
+        {
+            try
+            {
+                var result = await _formService.GetSubmissionsAsync(GetUserId(), filter);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>Obtener un formulario por ID.</summary>
         [HttpGet("{id}")]
-        public async Task<ActionResult<FormSubmissionResponse>> GetForm(int id)
+        public async Task<ActionResult<FormSubmissionDto>> GetById(int id)
         {
             try
             {
-                var userId = GetUserId();
-                var form = await _formService.GetFormSubmissionAsync(userId, id);
-                return Ok(form);
+                var result = await _formService.GetSubmissionAsync(GetUserId(), id);
+                return Ok(result);
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("search")]
-        public async Task<ActionResult<List<FormSubmissionResponse>>> SearchForms([FromBody] FormFilterRequest filter)
-        {
-            try
-            {
-                var userId = GetUserId();
-                var forms = await _formService.SearchFormSubmissionsAsync(userId, filter);
-                return Ok(forms);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
-        }
-
+        /// <summary>Actualizar el estado de un formulario.</summary>
         [HttpPut("{id}/status")]
-        public async Task<ActionResult> UpdateFormStatus(int id, [FromBody] StatusUpdateRequest request)
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateFormSubmissionStatusRequest request)
         {
             try
             {
-                var userId = GetUserId();
-                var result = await _formService.UpdateFormStatusAsync(userId, id, request.Status);
-                return Ok(new { message = "Estado actualizado exitosamente" });
+                await _formService.UpdateStatusAsync(GetUserId(), id, request);
+                return Ok(new { message = "Estado actualizado exitosamente." });
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        /// <summary>Cuadrilla verifica el formulario.</summary>
+        [HttpPut("{id}/verify")]
+        [Authorize(Roles = "DEV,SOFTWARE,CUADRILLA")]
+        public async Task<IActionResult> Verify(int id, [FromBody] VerifyFormSubmissionRequest request)
+        {
+            try
+            {
+                await _formService.VerifySubmissionAsync(GetUserId(), id, request);
+                return Ok(new { message = "Formulario verificado exitosamente." });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>Eliminar un formulario (solo DEV/SOFTWARE).</summary>
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteForm(int id)
+        [Authorize(Roles = "DEV,SOFTWARE")]
+        public async Task<IActionResult> Delete(int id)
         {
             try
             {
-                var userId = GetUserId();
-                var result = await _formService.DeleteFormSubmissionAsync(userId, id);
-                return Ok(new { message = "Formulario eliminado exitosamente" });
+                await _formService.DeleteSubmissionAsync(GetUserId(), id);
+                return Ok(new { message = "Formulario eliminado." });
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        /// <summary>Exportar formularios a Excel.</summary>
         [HttpGet("export/excel")]
-        public async Task<ActionResult> ExportToExcel()
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        public async Task<IActionResult> ExportToExcel([FromQuery] FormSubmissionFilterRequest filter)
         {
             try
             {
-                var userId = GetUserId();
-                var forms = await _formService.GetAllFormSubmissionsAsync(userId);
-
-                if (!forms.Any())
+                var pagedResult = await _formService.GetSubmissionsAsync(GetUserId(), new FormSubmissionFilterRequest
                 {
-                    return NotFound(new { message = "No hay datos para exportar" });
-                }
+                    PageNumber = 1,
+                    PageSize = 10000,
+                    FormTemplateId = filter.FormTemplateId,
+                    Status = filter.Status,
+                    StartDate = filter.StartDate,
+                    EndDate = filter.EndDate
+                });
 
-                // Convertir respuestas a modelos de formulario para exportar
-                var data = forms.Select(f => new FormSubmission
-                {
-                    Id = f.Id,
-                    Nombre = f.Nombre,
-                    Email = f.Email,
-                    Telefono = f.Telefono,
-                    Empresa = f.Empresa,
-                    Asunto = f.Asunto,
-                    Mensaje = f.Mensaje,
-                    Fecha = f.Fecha,
-                    CreatedAt = f.CreatedAt,
-                    Status = f.Status
-                }).ToList();
+                if (!pagedResult.Items.Any())
+                    return NotFound(new { message = "No hay datos para exportar." });
 
-                var excelBytes = _exportService.ExportToExcel(data);
-                var fileName = $"formularios_{DateTime.Now:yyyy-MM-dd}.xlsx";
-
-                return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+                var bytes = _exportService.ExportFormSubmissionsToExcel(pagedResult.Items);
+                var fileName = $"formularios_{DateTime.Now:yyyy-MM-dd_HH-mm}.xlsx";
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
-    }
-
-    public class StatusUpdateRequest
-    {
-        public string Status { get; set; }
     }
 }

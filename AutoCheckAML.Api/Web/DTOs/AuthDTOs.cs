@@ -13,6 +13,9 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string Email { get; set; }
         public string FullName { get; set; }
         public string Token { get; set; }
+        public string RefreshToken { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
+        public List<string> Permissions { get; set; } = new List<string>();
     }
 
     public class RegisterRequest

@@ -49,6 +49,9 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ICrewService, CrewService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
 
 // Add Logger Service
 builder.Services.AddScoped<ILoggerService, LoggerService>();

@@ -50,6 +50,11 @@ namespace AutoCheckAML.Api.Entity
         /// </summary>
         public bool IsRevoked { get; set; } = false;
 
+        /// <summary>
+        /// Indica si el token ha expirado (calculado).
+        /// </summary>
+        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+
         // Navigation properties
         public virtual User User { get; set; }
     }

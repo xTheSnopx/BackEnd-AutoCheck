@@ -7,12 +7,12 @@ namespace AutoCheckAML.Api.Business
 {
     public interface IFormService
     {
-        Task<FormSubmissionResponse> SubmitFormAsync(int userId, FormSubmissionRequest request);
-        Task<List<FormSubmissionResponse>> GetAllFormSubmissionsAsync(int userId);
-        Task<FormSubmissionResponse> GetFormSubmissionAsync(int userId, int formId);
-        Task<List<FormSubmissionResponse>> SearchFormSubmissionsAsync(int userId, FormFilterRequest filter);
-        Task<bool> UpdateFormStatusAsync(int userId, int formId, string status);
-        Task<bool> DeleteFormSubmissionAsync(int userId, int formId);
+        Task<FormSubmissionDto> CreateSubmissionAsync(int userId, CreateFormSubmissionRequest request);
+        Task<PagedResult<FormSubmissionDto>> GetSubmissionsAsync(int userId, FormSubmissionFilterRequest filter);
+        Task<FormSubmissionDto> GetSubmissionAsync(int userId, int formId);
+        Task<bool> UpdateStatusAsync(int userId, int formId, UpdateFormSubmissionStatusRequest request);
+        Task<bool> VerifySubmissionAsync(int userId, int formId, VerifyFormSubmissionRequest request);
+        Task<bool> DeleteSubmissionAsync(int userId, int formId);
     }
 
     public class FormService : IFormService
@@ -24,257 +24,208 @@ namespace AutoCheckAML.Api.Business
             _context = context;
         }
 
-        public async Task<FormSubmissionResponse> SubmitFormAsync(int userId, FormSubmissionRequest request)
+        public async Task<FormSubmissionDto> CreateSubmissionAsync(int userId, CreateFormSubmissionRequest request)
         {
-            try
+            // Validar que la plantilla exista y esté activa
+            var template = await _context.FormTemplates
+                .FirstOrDefaultAsync(t => t.Id == request.FormTemplateId && t.IsActive);
+
+            if (template == null)
+                throw new KeyNotFoundException($"Plantilla de formulario {request.FormTemplateId} no encontrada o inactiva.");
+
+            var submission = new FormSubmission
             {
-                // Validaciones
-                ValidateFormSubmission(request);
+                FormTemplateId = request.FormTemplateId,
+                SubmittedByUserId = userId,
+                AssignedToCrewId = request.AssignedToCrewId,
+                ActivityLocation = request.ActivityLocation,
+                ActivityDate = request.ActivityDate,
+                ObservationsByRespondent = request.ObservationsByRespondent,
+                Status = "Pendiente",
+                CreatedAt = DateTime.UtcNow
+            };
 
-                var formSubmission = new FormSubmission
-                {
-                    UserId = userId,
-                    Nombre = request.Nombre.Trim(),
-                    Email = request.Email.Trim().ToLower(),
-                    Telefono = request.Telefono.Trim(),
-                    Empresa = request.Empresa.Trim(),
-                    Asunto = request.Asunto.Trim(),
-                    Mensaje = request.Mensaje.Trim(),
-                    Fecha = request.Fecha,
-                    CreatedAt = DateTime.Now,
-                    Status = "Pendiente"
-                };
+            _context.FormSubmissions.Add(submission);
+            await _context.SaveChangesAsync();
 
-                _context.FormSubmissions.Add(formSubmission);
-                await _context.SaveChangesAsync();
-
-                return new FormSubmissionResponse
-                {
-                    Id = formSubmission.Id,
-                    Nombre = formSubmission.Nombre,
-                    Email = formSubmission.Email,
-                    Telefono = formSubmission.Telefono,
-                    Empresa = formSubmission.Empresa,
-                    Asunto = formSubmission.Asunto,
-                    Mensaje = formSubmission.Mensaje,
-                    Fecha = formSubmission.Fecha,
-                    CreatedAt = formSubmission.CreatedAt,
-                    Status = formSubmission.Status,
-                    Message = "Formulario registrado exitosamente"
-                };
-            }
-            catch (Exception ex)
+            // Agregar respuestas
+            if (request.Answers?.Any() == true)
             {
-                throw new Exception($"Error al enviar formulario: {ex.Message}");
-            }
-        }
-
-        public async Task<List<FormSubmissionResponse>> GetAllFormSubmissionsAsync(int userId)
-        {
-            try
-            {
-                var forms = await _context.FormSubmissions
-                    .Where(f => f.UserId == userId)
-                    .OrderByDescending(f => f.CreatedAt)
-                    .ToListAsync();
-
-                return forms.Select(f => new FormSubmissionResponse
+                var answers = request.Answers.Select(a => new Answer
                 {
-                    Id = f.Id,
-                    Nombre = f.Nombre,
-                    Email = f.Email,
-                    Telefono = f.Telefono,
-                    Empresa = f.Empresa,
-                    Asunto = f.Asunto,
-                    Mensaje = f.Mensaje,
-                    Fecha = f.Fecha,
-                    CreatedAt = f.CreatedAt,
-                    Status = f.Status
+                    FormSubmissionId = submission.Id,
+                    FormFieldId = a.FormFieldId,
+                    FieldValue = a.FieldValue,
+                    Notes = a.Notes
                 }).ToList();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al obtener formularios: {ex.Message}");
-            }
-        }
 
-        public async Task<FormSubmissionResponse> GetFormSubmissionAsync(int userId, int formId)
-        {
-            try
-            {
-                var form = await _context.FormSubmissions
-                    .FirstOrDefaultAsync(f => f.Id == formId && f.UserId == userId);
-
-                if (form == null)
-                {
-                    throw new KeyNotFoundException("Formulario no encontrado");
-                }
-
-                return new FormSubmissionResponse
-                {
-                    Id = form.Id,
-                    Nombre = form.Nombre,
-                    Email = form.Email,
-                    Telefono = form.Telefono,
-                    Empresa = form.Empresa,
-                    Asunto = form.Asunto,
-                    Mensaje = form.Mensaje,
-                    Fecha = form.Fecha,
-                    CreatedAt = form.CreatedAt,
-                    Status = form.Status
-                };
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al obtener formulario: {ex.Message}");
-            }
-        }
-
-        public async Task<List<FormSubmissionResponse>> SearchFormSubmissionsAsync(int userId, FormFilterRequest filter)
-        {
-            try
-            {
-                var query = _context.FormSubmissions
-                    .Where(f => f.UserId == userId);
-
-                // Filtrar por término de búsqueda
-                if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
-                {
-                    var searchTerm = filter.SearchTerm.ToLower();
-                    query = query.Where(f =>
-                        f.Nombre.ToLower().Contains(searchTerm) ||
-                        f.Email.ToLower().Contains(searchTerm) ||
-                        f.Empresa.ToLower().Contains(searchTerm) ||
-                        f.Asunto.ToLower().Contains(searchTerm));
-                }
-
-                // Filtrar por estado
-                if (!string.IsNullOrWhiteSpace(filter.Status))
-                {
-                    query = query.Where(f => f.Status == filter.Status);
-                }
-
-                // Filtrar por rango de fechas
-                if (filter.StartDate.HasValue)
-                {
-                    query = query.Where(f => f.Fecha >= filter.StartDate.Value);
-                }
-
-                if (filter.EndDate.HasValue)
-                {
-                    query = query.Where(f => f.Fecha <= filter.EndDate.Value);
-                }
-
-                // Ordenar y paginar
-                var totalCount = await query.CountAsync();
-                var forms = await query
-                    .OrderByDescending(f => f.CreatedAt)
-                    .Skip((filter.PageNumber - 1) * filter.PageSize)
-                    .Take(filter.PageSize)
-                    .ToListAsync();
-
-                return forms.Select(f => new FormSubmissionResponse
-                {
-                    Id = f.Id,
-                    Nombre = f.Nombre,
-                    Email = f.Email,
-                    Telefono = f.Telefono,
-                    Empresa = f.Empresa,
-                    Asunto = f.Asunto,
-                    Mensaje = f.Mensaje,
-                    Fecha = f.Fecha,
-                    CreatedAt = f.CreatedAt,
-                    Status = f.Status
-                }).ToList();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al buscar formularios: {ex.Message}");
-            }
-        }
-
-        public async Task<bool> UpdateFormStatusAsync(int userId, int formId, string status)
-        {
-            try
-            {
-                var validStatuses = new[] { "Pendiente", "Revisado", "Completado" };
-                if (!validStatuses.Contains(status))
-                {
-                    throw new ArgumentException("Estado inválido");
-                }
-
-                var form = await _context.FormSubmissions
-                    .FirstOrDefaultAsync(f => f.Id == formId && f.UserId == userId);
-
-                if (form == null)
-                {
-                    throw new KeyNotFoundException("Formulario no encontrado");
-                }
-
-                form.Status = status;
+                _context.Answers.AddRange(answers);
                 await _context.SaveChangesAsync();
-                return true;
             }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al actualizar estado: {ex.Message}");
-            }
+
+            return await GetSubmissionAsync(userId, submission.Id);
         }
 
-        public async Task<bool> DeleteFormSubmissionAsync(int userId, int formId)
+        public async Task<PagedResult<FormSubmissionDto>> GetSubmissionsAsync(int userId, FormSubmissionFilterRequest filter)
         {
-            try
-            {
-                var form = await _context.FormSubmissions
-                    .FirstOrDefaultAsync(f => f.Id == formId && f.UserId == userId);
+            // Obtener el rol del usuario para filtrar apropiadamente
+            var userRoles = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == userId && ur.IsActive)
+                .Select(ur => ur.Role.Name)
+                .ToListAsync();
 
-                if (form == null)
-                {
-                    throw new KeyNotFoundException("Formulario no encontrado");
-                }
+            var query = _context.FormSubmissions
+                .Include(fs => fs.FormTemplate)
+                .Include(fs => fs.SubmittedByUser)
+                .Include(fs => fs.AssignedToCrew)
+                .Include(fs => fs.VerifiedByUser)
+                .Include(fs => fs.Answers).ThenInclude(a => a.FormField)
+                .AsQueryable();
 
-                _context.FormSubmissions.Remove(form);
-                await _context.SaveChangesAsync();
-                return true;
-            }
-            catch (Exception ex)
+            // DEV y SOFTWARE ven todos; INGENIERO solo los suyos; CUADRILLA solo los asignados
+            bool isSuperUser = userRoles.Contains("DEV") || userRoles.Contains("SOFTWARE");
+            bool isCuadrilla = userRoles.Contains("CUADRILLA");
+
+            if (!isSuperUser && isCuadrilla)
             {
-                throw new Exception($"Error al eliminar formulario: {ex.Message}");
+                var userCrewId = await _context.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.CrewId)
+                    .FirstOrDefaultAsync();
+                query = query.Where(fs => fs.AssignedToCrewId == userCrewId);
             }
+            else if (!isSuperUser)
+            {
+                query = query.Where(fs => fs.SubmittedByUserId == userId);
+            }
+
+            // Aplicar filtros
+            if (filter.FormTemplateId.HasValue)
+                query = query.Where(fs => fs.FormTemplateId == filter.FormTemplateId.Value);
+
+            if (filter.SubmittedByUserId.HasValue)
+                query = query.Where(fs => fs.SubmittedByUserId == filter.SubmittedByUserId.Value);
+
+            if (filter.AssignedToCrewId.HasValue)
+                query = query.Where(fs => fs.AssignedToCrewId == filter.AssignedToCrewId.Value);
+
+            if (!string.IsNullOrWhiteSpace(filter.Status))
+                query = query.Where(fs => fs.Status == filter.Status);
+
+            if (!string.IsNullOrWhiteSpace(filter.ActivityLocation))
+                query = query.Where(fs => fs.ActivityLocation.Contains(filter.ActivityLocation));
+
+            if (filter.StartDate.HasValue)
+                query = query.Where(fs => fs.ActivityDate >= filter.StartDate.Value);
+
+            if (filter.EndDate.HasValue)
+                query = query.Where(fs => fs.ActivityDate <= filter.EndDate.Value);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(fs => fs.CreatedAt)
+                .Skip((filter.PageNumber - 1) * filter.PageSize)
+                .Take(filter.PageSize)
+                .ToListAsync();
+
+            return new PagedResult<FormSubmissionDto>
+            {
+                Items = items.Select(MapToDto).ToList(),
+                TotalCount = totalCount,
+                PageNumber = filter.PageNumber,
+                PageSize = filter.PageSize
+            };
         }
 
-        private void ValidateFormSubmission(FormSubmissionRequest request)
+        public async Task<FormSubmissionDto> GetSubmissionAsync(int userId, int formId)
         {
-            if (string.IsNullOrWhiteSpace(request.Nombre))
-                throw new ArgumentException("El nombre es requerido");
+            var submission = await _context.FormSubmissions
+                .Include(fs => fs.FormTemplate)
+                .Include(fs => fs.SubmittedByUser)
+                .Include(fs => fs.AssignedToCrew)
+                .Include(fs => fs.VerifiedByUser)
+                .Include(fs => fs.Answers).ThenInclude(a => a.FormField)
+                .FirstOrDefaultAsync(fs => fs.Id == formId);
 
-            if (string.IsNullOrWhiteSpace(request.Email) || !IsValidEmail(request.Email))
-                throw new ArgumentException("El email es inválido");
+            if (submission == null)
+                throw new KeyNotFoundException("Formulario no encontrado.");
 
-            if (string.IsNullOrWhiteSpace(request.Telefono))
-                throw new ArgumentException("El teléfono es requerido");
-
-            if (string.IsNullOrWhiteSpace(request.Empresa))
-                throw new ArgumentException("La empresa es requerida");
-
-            if (string.IsNullOrWhiteSpace(request.Asunto))
-                throw new ArgumentException("El asunto es requerido");
-
-            if (string.IsNullOrWhiteSpace(request.Mensaje))
-                throw new ArgumentException("El mensaje es requerido");
+            return MapToDto(submission);
         }
 
-        private bool IsValidEmail(string email)
+        public async Task<bool> UpdateStatusAsync(int userId, int formId, UpdateFormSubmissionStatusRequest request)
         {
-            try
-            {
-                var addr = new System.Net.Mail.MailAddress(email);
-                return addr.Address == email;
-            }
-            catch
-            {
-                return false;
-            }
+            var submission = await _context.FormSubmissions
+                .FirstOrDefaultAsync(fs => fs.Id == formId);
+
+            if (submission == null)
+                throw new KeyNotFoundException("Formulario no encontrado.");
+
+            submission.ChangeStatus(request.Status, userId, request.Comment);
+            await _context.SaveChangesAsync();
+            return true;
         }
+
+        public async Task<bool> VerifySubmissionAsync(int userId, int formId, VerifyFormSubmissionRequest request)
+        {
+            var submission = await _context.FormSubmissions
+                .FirstOrDefaultAsync(fs => fs.Id == formId);
+
+            if (submission == null)
+                throw new KeyNotFoundException("Formulario no encontrado.");
+
+            submission.ObservationsByRectifier = request.ObservationsByRectifier;
+            submission.RequiresReview = request.RequiresReview;
+            submission.VerifiedByUserId = userId;
+            submission.VerifiedAt = DateTime.UtcNow;
+            submission.ChangeStatus("Verificado", userId);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> DeleteSubmissionAsync(int userId, int formId)
+        {
+            var submission = await _context.FormSubmissions
+                .FirstOrDefaultAsync(fs => fs.Id == formId);
+
+            if (submission == null)
+                throw new KeyNotFoundException("Formulario no encontrado.");
+
+            _context.FormSubmissions.Remove(submission);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        private static FormSubmissionDto MapToDto(FormSubmission fs) => new FormSubmissionDto
+        {
+            Id = fs.Id,
+            FormTemplateId = fs.FormTemplateId,
+            FormTemplateName = fs.FormTemplate?.Name,
+            SubmittedByUserId = fs.SubmittedByUserId,
+            SubmittedByUserName = fs.SubmittedByUser?.FullName,
+            AssignedToCrewId = fs.AssignedToCrewId,
+            AssignedToCrewName = fs.AssignedToCrew?.Name,
+            ActivityLocation = fs.ActivityLocation,
+            ActivityDate = fs.ActivityDate,
+            ObservationsByRespondent = fs.ObservationsByRespondent,
+            ObservationsByRectifier = fs.ObservationsByRectifier,
+            VerifiedAt = fs.VerifiedAt,
+            VerifiedByUserId = fs.VerifiedByUserId,
+            VerifiedByUserName = fs.VerifiedByUser?.FullName,
+            RequiresReview = fs.RequiresReview,
+            Status = fs.Status,
+            CreatedAt = fs.CreatedAt,
+            Answers = fs.Answers?.Select(a => new AnswerDto
+            {
+                Id = a.Id,
+                FormSubmissionId = a.FormSubmissionId,
+                FormFieldId = a.FormFieldId,
+                FormFieldLabel = a.FormField?.Label,
+                FieldValue = a.FieldValue,
+                Notes = a.Notes
+            }).ToList() ?? new List<AnswerDto>()
+        };
     }
 }
