@@ -8,12 +8,15 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
 
 // Add DbContext with SQLite
 builder.Services.AddDbContext<AutoCheckAMLContext>(options =>
@@ -102,53 +105,43 @@ builder.Services.AddAuthentication(x =>
     };
 });
 
-// Add Swagger
-builder.Services.AddSwaggerGen(c =>
+// Add OpenAPI
+builder.Services.AddOpenApi(options =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        Title = "AutoCheckAML API",
-        Version = "v1",
-        Description = "API para gestión de inspecciones de flota y cumplimiento AML",
-        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        document.Info.Title = "AutoCheckAML API";
+        document.Info.Version = "v1";
+        document.Info.Description = "API para gestión de inspecciones de flota y cumplimiento AML";
+        document.Info.Contact = new OpenApiContact
         {
             Name = "Soporte AutoCheckAML",
             Email = "soporte@autocheckaml.com"
-        }
-    });
+        };
 
-    // Add JWT Authentication to Swagger
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
-        Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
+        // Add Bearer Token security scheme
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes.Add("Bearer", new OpenApiSecurityScheme
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+            Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+        });
 
-    // Include XML comments if available
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath);
-    }
+        var requirements = new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecuritySchemeReference("Bearer", document),
+                new List<string>()
+            }
+        };
+        document.Security ??= new List<OpenApiSecurityRequirement>();
+        document.Security.Add(requirements);
+
+        return Task.CompletedTask;
+    });
 });
 
 var app = builder.Build();
@@ -217,17 +210,14 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+app.MapOpenApi();
+app.MapScalarApiReference("/scalar", options =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoCheckAML API v1");
-    c.RoutePrefix = "swagger";
-    c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-    c.DefaultModelsExpandDepth(2);
-    c.DisplayRequestDuration();
-    c.EnableDeepLinking();
-    c.EnableValidator();
+    options.WithTitle("AutoCheckAML API")
+           .WithTheme(ScalarTheme.DeepSpace)
+           .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
 });
+app.MapGet("/swagger", () => Results.Redirect("/scalar"));
 
 // Use Custom Exception Handling Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
