@@ -422,9 +422,9 @@ namespace AutoCheckAML.Api.Data
                 new User
                 {
                     Id = 1,
-                    Username = "admin",
+                    Username = "Admin",
                     Email = "admin@autocheck.com",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin"),
                     FullName = "Administrador del Sistema",
                     IsActive = true,
                     CrewId = null,
@@ -439,8 +439,10 @@ namespace AutoCheckAML.Api.Data
             );
 
             modelBuilder.Entity<UserRole>().HasData(
-                new UserRole { UserId = 1, RoleId = 2, AssignedAt = now, ExpiresAt = null, IsActive = true } // Usuario admin con rol SOFTWARE
+                new UserRole { UserId = 1, RoleId = 1, AssignedAt = now, ExpiresAt = null, IsActive = true } // Rol DEV (todos los permisos)
             );
         }
+    }
+}
     }
 }

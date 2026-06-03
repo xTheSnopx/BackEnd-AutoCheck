@@ -17,7 +17,8 @@ builder.Services.AddControllers();
 
 // Add DbContext with SQLite
 builder.Services.AddDbContext<AutoCheckAMLContext>(options =>
-    options.UseSqlite("Data Source=autocheckaml.db"));
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
+        ?? "Data Source=autocheckaml.db"));
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
@@ -102,7 +103,53 @@ builder.Services.AddAuthentication(x =>
 });
 
 // Add Swagger
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "AutoCheckAML API",
+        Version = "v1",
+        Description = "API para gestión de inspecciones de flota y cumplimiento AML",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "Soporte AutoCheckAML",
+            Email = "soporte@autocheckaml.com"
+        }
+    });
+
+    // Add JWT Authentication to Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+
+    // Include XML comments if available
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
+});
 
 var app = builder.Build();
 
@@ -113,13 +160,74 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.EnsureCreated();
 }
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Ensure admin user exists with correct password
+using (var scope = app.Services.CreateScope())
 {
-    app.MapOpenApi();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AutoCheckAMLContext>();
+    var adminUser = await dbContext.Users
+        .FirstOrDefaultAsync(u => u.Username == "Admin" && !u.IsDeleted);
+
+    if (adminUser == null)
+    {
+        adminUser = new AutoCheckAML.Api.Entity.User
+        {
+            Username = "Admin",
+            Email = "admin@autocheck.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin"),
+            FullName = "Administrador del Sistema",
+            IsActive = true,
+            CrewId = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = null,
+            DeletedAt = null,
+            IsDeleted = false,
+            LastLogin = null,
+            LastModifiedBy = null,
+            DeletedBy = null
+        };
+        dbContext.Users.Add(adminUser);
+        await dbContext.SaveChangesAsync();
+    }
+    else
+    {
+        // Update password if it doesn't match
+        if (!BCrypt.Net.BCrypt.Verify("Admin", adminUser.PasswordHash))
+        {
+            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin");
+            adminUser.UpdatedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    // Ensure DEV role assignment exists
+    var adminRole = await dbContext.UserRoles
+        .FirstOrDefaultAsync(ur => ur.UserId == adminUser.Id && ur.RoleId == 1);
+    if (adminRole == null)
+    {
+        dbContext.UserRoles.Add(new AutoCheckAML.Api.Entity.UserRole
+        {
+            UserId = adminUser.Id,
+            RoleId = 1,
+            AssignedAt = DateTime.UtcNow,
+            ExpiresAt = null,
+            IsActive = true
+        });
+        await dbContext.SaveChangesAsync();
+    }
 }
 
-app.UseHttpsRedirection();
+// Configure the HTTP request pipeline
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoCheckAML API v1");
+    c.RoutePrefix = "swagger";
+    c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+    c.DefaultModelsExpandDepth(2);
+    c.DisplayRequestDuration();
+    c.EnableDeepLinking();
+    c.EnableValidator();
+});
 
 // Use Custom Exception Handling Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -133,4 +241,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+app.Run("http://0.0.0.0:5000");
