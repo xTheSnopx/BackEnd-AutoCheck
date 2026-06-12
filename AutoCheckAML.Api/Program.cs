@@ -217,6 +217,62 @@ using (var scope = app.Services.CreateScope())
         await dbContext.SaveChangesAsync();
     }
 
+    // Helper local para asegurar la existencia de usuarios de prueba
+    async Task EnsureTestUser(string username, string email, string password, string fullName, int roleId)
+    {
+        var testUser = await dbContext.Users
+            .FirstOrDefaultAsync(u => (u.Username.ToLower() == username.ToLower() || u.Email == email) && !u.IsDeleted);
+
+        if (testUser == null)
+        {
+            testUser = new AutoCheckAML.Api.Entity.User
+            {
+                Username = username,
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                FullName = fullName,
+                IsActive = true,
+                CrewId = null,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            };
+            dbContext.Users.Add(testUser);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            bool changed = false;
+            if (!BCrypt.Net.BCrypt.Verify(password, testUser.PasswordHash))
+            {
+                testUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+                changed = true;
+            }
+            if (changed)
+            {
+                testUser.UpdatedAt = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+        var testUserRole = await dbContext.UserRoles
+            .FirstOrDefaultAsync(ur => ur.UserId == testUser.Id && ur.RoleId == roleId);
+        if (testUserRole == null)
+        {
+            dbContext.UserRoles.Add(new AutoCheckAML.Api.Entity.UserRole
+            {
+                UserId = testUser.Id,
+                RoleId = roleId,
+                AssignedAt = DateTime.UtcNow,
+                IsActive = true
+            });
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    await EnsureTestUser("ingeniero", "ingeniero@autocheck.com", "Ingeniero2026", "Ingeniero Mecánico Juan", 3);
+    await EnsureTestUser("hsq", "hsq@autocheck.com", "Hsq2026", "Ingeniero HSQ Maria", 4);
+    await EnsureTestUser("cuadrilla", "cuadrilla@autocheck.com", "Cuadrilla2026", "Operador Cuadrilla Carlos", 5);
+
     // Ensure default FormTemplate and FormFields exist
     var defaultTemplate = await dbContext.FormTemplates.FirstOrDefaultAsync(t => t.Id == 1);
     if (defaultTemplate == null)
