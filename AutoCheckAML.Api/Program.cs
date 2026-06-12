@@ -158,7 +158,7 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AutoCheckAMLContext>();
     var adminUser = await dbContext.Users
-        .FirstOrDefaultAsync(u => u.Username == "Admin" && !u.IsDeleted);
+        .FirstOrDefaultAsync(u => (u.Username.ToLower() == "admin" || u.Email == "admin@autocheck.com") && !u.IsDeleted);
 
     if (adminUser == null)
     {
@@ -166,7 +166,7 @@ using (var scope = app.Services.CreateScope())
         {
             Username = "Admin",
             Email = "admin@autocheck.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2026"),
             FullName = "Administrador del Sistema",
             IsActive = true,
             CrewId = null,
@@ -183,10 +183,19 @@ using (var scope = app.Services.CreateScope())
     }
     else
     {
-        // Update password if it doesn't match
-        if (!BCrypt.Net.BCrypt.Verify("Admin", adminUser.PasswordHash))
+        bool changed = false;
+        if (adminUser.Username != "Admin")
         {
-            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin");
+            adminUser.Username = "Admin";
+            changed = true;
+        }
+        if (!BCrypt.Net.BCrypt.Verify("Admin2026", adminUser.PasswordHash))
+        {
+            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2026");
+            changed = true;
+        }
+        if (changed)
+        {
             adminUser.UpdatedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync();
         }
@@ -205,6 +214,77 @@ using (var scope = app.Services.CreateScope())
             ExpiresAt = null,
             IsActive = true
         });
+        await dbContext.SaveChangesAsync();
+    }
+
+    // Ensure default FormTemplate and FormFields exist
+    var defaultTemplate = await dbContext.FormTemplates.FirstOrDefaultAsync(t => t.Id == 1);
+    if (defaultTemplate == null)
+    {
+        defaultTemplate = new AutoCheckAML.Api.Entity.FormTemplate
+        {
+            Id = 1,
+            Name = "Inspección de Vehículo AutoCheck",
+            Description = "Formulario de inspección técnica diaria del vehículo y cumplimiento del operador",
+            FormType = "Mecánico",
+            Version = 1,
+            IsActive = true,
+            RequiresSignature = true,
+            DisplayOrder = 1,
+            CreatedByUserId = adminUser.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        dbContext.FormTemplates.Add(defaultTemplate);
+        await dbContext.SaveChangesAsync();
+
+        var fields = new List<AutoCheckAML.Api.Entity.FormField>
+        {
+            // Category 1: Documentos
+            new() { Id = 1, FormTemplateId = 1, Label = "Permiso de Circulación al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 1, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 2, FormTemplateId = 1, Label = "Revisión Tecnomecánica al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 2, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 3, FormTemplateId = 1, Label = "SOAT Vigente", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 3, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 2: Operador
+            new() { Id = 4, FormTemplateId = 1, Label = "Licencia Municipal", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 4, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 5, FormTemplateId = 1, Label = "Curso de Operador", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 5, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 6, FormTemplateId = 1, Label = "Licencia Interna", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 6, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Luces
+            new() { Id = 7, FormTemplateId = 1, Label = "Altas / Bajas", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 7, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 8, FormTemplateId = 1, Label = "Retroceso / Emergencia", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 8, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 9, FormTemplateId = 1, Label = "Laterales (Delante/Trasera)", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 9, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 10, FormTemplateId = 1, Label = "Freno / Estacionamiento", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 10, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 11, FormTemplateId = 1, Label = "Cabina Interior", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 11, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Neumáticos
+            new() { Id = 12, FormTemplateId = 1, Label = "DEL. IZQUIERDO", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 12, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 13, FormTemplateId = 1, Label = "DEL. DERECHO", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 13, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 14, FormTemplateId = 1, Label = "TRAS. INTERNOS", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 14, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 15, FormTemplateId = 1, Label = "TRAS. EXTERNOS", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 15, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 16, FormTemplateId = 1, Label = "REPUESTOS", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 16, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Accesorios
+            new() { Id = 17, FormTemplateId = 1, Label = "Extintor/Botiquín", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 17, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 18, FormTemplateId = 1, Label = "Conos/Bocina", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 18, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 19, FormTemplateId = 1, Label = "Sirena/Licuadora", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 19, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 20, FormTemplateId = 1, Label = "Evaluador Cop.", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 20, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 21, FormTemplateId = 1, Label = "Cortacorrientes / Sist. Comunicación", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 21, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Vidrios
+            new() { Id = 22, FormTemplateId = 1, Label = "PARABRISAS", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 22, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 23, FormTemplateId = 1, Label = "ESQUIERDO/DER.", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 23, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Espejos
+            new() { Id = 24, FormTemplateId = 1, Label = "LATERALES", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 24, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 25, FormTemplateId = 1, Label = "CABINA", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 25, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+
+            // Category 3: Sistemas - Estabilizadores
+            new() { Id = 26, FormTemplateId = 1, Label = "Delant. Izq/Der", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 26, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 27, FormTemplateId = 1, Label = "Tras. Izq/Der", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 27, Options = "[\"OK\", \"FALLO\"]", IsActive = true, CreatedAt = DateTime.UtcNow }
+        };
+
+        dbContext.FormFields.AddRange(fields);
         await dbContext.SaveChangesAsync();
     }
 }
