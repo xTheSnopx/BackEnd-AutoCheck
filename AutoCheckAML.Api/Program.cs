@@ -18,10 +18,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Add DbContext with SQLite
+// Add DbContext with PostgreSQL
 builder.Services.AddDbContext<AutoCheckAMLContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? "Data Source=autocheckaml.db"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") 
+        ?? "Host=localhost;Database=autocheckaml;Username=postgres;Password=postgrespassword"));
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
@@ -146,11 +146,29 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
-// Create database and apply migrations
+// Create database and apply migrations with retry to wait for PostgreSQL container startup
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AutoCheckAMLContext>();
-    dbContext.Database.EnsureCreated();
+    int retries = 5;
+    while (retries > 0)
+    {
+        try
+        {
+            dbContext.Database.EnsureCreated();
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            if (retries == 0)
+            {
+                throw;
+            }
+            Console.WriteLine($"Database connection failed. Retrying in 3 seconds... ({ex.Message})");
+            System.Threading.Thread.Sleep(3000);
+        }
+    }
 }
 
 // Ensure admin user exists with correct password
@@ -189,7 +207,17 @@ using (var scope = app.Services.CreateScope())
             adminUser.Username = "Admin";
             changed = true;
         }
-        if (!BCrypt.Net.BCrypt.Verify("Admin2026", adminUser.PasswordHash))
+        bool verifyFailed = false;
+        try
+        {
+            verifyFailed = !BCrypt.Net.BCrypt.Verify("Admin2026", adminUser.PasswordHash);
+        }
+        catch (Exception)
+        {
+            verifyFailed = true;
+        }
+
+        if (verifyFailed)
         {
             adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2026");
             changed = true;
@@ -242,7 +270,17 @@ using (var scope = app.Services.CreateScope())
         else
         {
             bool changed = false;
-            if (!BCrypt.Net.BCrypt.Verify(password, testUser.PasswordHash))
+            bool verifyFailed = false;
+            try
+            {
+                verifyFailed = !BCrypt.Net.BCrypt.Verify(password, testUser.PasswordHash);
+            }
+            catch (Exception)
+            {
+                verifyFailed = true;
+            }
+
+            if (verifyFailed)
             {
                 testUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
                 changed = true;
