@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
 
 // Add DbContext with PostgreSQL
 builder.Services.AddDbContext<AutoCheckAMLContext>(options =>
@@ -60,25 +61,38 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 // Add Logger Service
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 
-// Add CORS
+// Add CORS - Configure allowed origins from environment or appsettings
+var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(',')
+    ?? builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:3000", "http://localhost:5173" }; // Default for development
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowSpecificOrigins", policyBuilder =>
     {
-        builder.AllowAnyOrigin()
+        policyBuilder.WithOrigins(allowedOrigins)
                .AllowAnyMethod()
-               .AllowAnyHeader();
+               .AllowAnyHeader()
+               .AllowCredentials(); // Important for cookies/auth headers
     });
 });
 
 // Configure JWT Authentication
-var jwtSecret = builder.Configuration["Jwt:Secret"];
+// Prefer environment variables over appsettings for sensitive data
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
+    ?? builder.Configuration["Jwt:Secret"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
 if (string.IsNullOrEmpty(jwtSecret) || string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
 {
-    throw new InvalidOperationException("JWT configuration is missing in appsettings.json");
+    throw new InvalidOperationException("JWT configuration is missing. Set JWT_SECRET environment variable or configure in appsettings.json");
+}
+
+// Validate JWT secret strength
+if (jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException("JWT Secret must be at least 32 characters long for security");
 }
 
 var key = Encoding.ASCII.GetBytes(jwtSecret);
@@ -90,7 +104,8 @@ builder.Services.AddAuthentication(x =>
 })
 .AddJwtBearer(x =>
 {
-    x.RequireHttpsMetadata = false;
+    // Only allow HTTP in development mode - HTTPS required in production
+    x.RequireHttpsMetadata = builder.Environment.IsProduction();
     x.SaveToken = true;
     x.TokenValidationParameters = new TokenValidationParameters
     {
@@ -175,6 +190,12 @@ using (var scope = app.Services.CreateScope())
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AutoCheckAMLContext>();
+
+    // Get admin password from environment variable or configuration
+    var adminPassword = Environment.GetEnvironmentVariable("ADMIN_DEFAULT_PASSWORD")
+        ?? builder.Configuration["DefaultPasswords:Admin"]
+        ?? throw new InvalidOperationException("Admin default password must be configured via ADMIN_DEFAULT_PASSWORD environment variable or appsettings");
+
     var adminUser = await dbContext.Users
         .FirstOrDefaultAsync(u => (u.Username.ToLower() == "admin" || u.Email == "admin@autocheck.com") && !u.IsDeleted);
 
@@ -184,7 +205,7 @@ using (var scope = app.Services.CreateScope())
         {
             Username = "Admin",
             Email = "admin@autocheck.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2026"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
             FullName = "Administrador del Sistema",
             IsActive = true,
             CrewId = null,
@@ -210,7 +231,7 @@ using (var scope = app.Services.CreateScope())
         bool verifyFailed = false;
         try
         {
-            verifyFailed = !BCrypt.Net.BCrypt.Verify("Admin2026", adminUser.PasswordHash);
+            verifyFailed = !BCrypt.Net.BCrypt.Verify(adminPassword, adminUser.PasswordHash);
         }
         catch (Exception)
         {
@@ -219,7 +240,7 @@ using (var scope = app.Services.CreateScope())
 
         if (verifyFailed)
         {
-            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin2026");
+            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
             changed = true;
         }
         if (changed)
@@ -307,9 +328,22 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    await EnsureTestUser("ingeniero", "ingeniero@autocheck.com", "Ingeniero2026", "Ingeniero Mecánico Juan", 3);
-    await EnsureTestUser("hsq", "hsq@autocheck.com", "Hsq2026", "Ingeniero HSQ Maria", 4);
-    await EnsureTestUser("cuadrilla", "cuadrilla@autocheck.com", "Cuadrilla2026", "Operador Cuadrilla Carlos", 5);
+    // Get test user passwords from environment variables or configuration
+    var ingenieroPassword = Environment.GetEnvironmentVariable("INGENIERO_DEFAULT_PASSWORD")
+        ?? builder.Configuration["DefaultPasswords:Ingeniero"]
+        ?? throw new InvalidOperationException("Ingeniero default password must be configured");
+
+    var supervisorHSEQPassword = Environment.GetEnvironmentVariable("SUPERVISOR_HSEQ_DEFAULT_PASSWORD")
+        ?? builder.Configuration["DefaultPasswords:SupervisorHSEQ"]
+        ?? throw new InvalidOperationException("Supervisor HSEQ default password must be configured");
+
+    var cuadrillaPassword = Environment.GetEnvironmentVariable("CUADRILLA_DEFAULT_PASSWORD")
+        ?? builder.Configuration["DefaultPasswords:Cuadrilla"]
+        ?? throw new InvalidOperationException("Cuadrilla default password must be configured");
+
+    await EnsureTestUser("ingeniero", "ingeniero@autocheck.com", ingenieroPassword, "Ingeniero Mecánico Juan", 3);
+    await EnsureTestUser("supervisorhseq", "supervisorhseq@autocheck.com", supervisorHSEQPassword, "Supervisor HSEQ Maria", 4);
+    await EnsureTestUser("cuadrilla", "cuadrilla@autocheck.com", cuadrillaPassword, "Operador Cuadrilla Carlos", 5);
 
     // Ensure default FormTemplate and FormFields exist
     var defaultTemplate = await dbContext.FormTemplates.FirstOrDefaultAsync(t => t.Id == 1);
@@ -334,10 +368,11 @@ using (var scope = app.Services.CreateScope())
 
         var fields = new List<AutoCheckAML.Api.Entity.FormField>
         {
+            new() { Id = 28, FormTemplateId = 1, Label = "Placa del Vehículo", Description = "Placa de identificación del vehículo", ValidationRules = "{}", DefaultValue = "", FieldType = "Text", IsRequired = true, DisplayOrder = 0, Options = "", IsActive = true, CreatedAt = DateTime.UtcNow },
             // Category 1: Documentos
-            new() { Id = 1, FormTemplateId = 1, Label = "Permiso de Circulación al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 1, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new() { Id = 2, FormTemplateId = 1, Label = "Revisión Tecnomecánica al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 2, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new() { Id = 3, FormTemplateId = 1, Label = "SOAT Vigente", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 3, Options = "[\"SI\", \"NO\", \"NA\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 1, FormTemplateId = 1, Label = "Permiso de Circulación al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 1, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 2, FormTemplateId = 1, Label = "Revisión Tecnomecánica al Día", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 2, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
+            new() { Id = 3, FormTemplateId = 1, Label = "SOAT Vigente", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 3, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
 
             // Category 2: Operador
             new() { Id = 4, FormTemplateId = 1, Label = "Licencia Municipal", Description = "", ValidationRules = "{}", DefaultValue = "", FieldType = "Select", IsRequired = true, DisplayOrder = 4, Options = "[\"SI\", \"NO\"]", IsActive = true, CreatedAt = DateTime.UtcNow },
@@ -397,7 +432,7 @@ app.MapGet("/swagger", () => Results.Redirect("/scalar"));
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Use CORS
-app.UseCors("AllowAll");
+app.UseCors("AllowSpecificOrigins");
 
 // Use Authentication and Authorization
 app.UseAuthentication();

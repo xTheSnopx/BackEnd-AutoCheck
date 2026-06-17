@@ -93,6 +93,19 @@ namespace AutoCheckAML.Api.Web.Controllers
             return Ok(new { message = "Rol revocado." });
         }
 
+        [HttpPost("{id}/change-password")]
+        [Authorize(Roles = "DEV,SOFTWARE")]
+        public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordRequest request)
+        {
+            try
+            {
+                await _userService.ChangePasswordAsync(id, request.NewPassword);
+                return Ok(new { message = "Contraseña actualizada exitosamente." });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpGet("export/excel")]
         [Authorize(Roles = "DEV,SOFTWARE")]
         public async Task<IActionResult> ExportToExcel()

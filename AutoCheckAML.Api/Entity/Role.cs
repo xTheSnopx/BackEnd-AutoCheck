@@ -9,7 +9,7 @@ namespace AutoCheckAML.Api.Entity
     {
         /// <summary>
         /// Nombre único del rol.
-        /// Valores posibles: DEV, SOFTWARE, INGENIERO_MECANICO, INGENIERO_HSQ, CUADRILLA
+        /// Valores posibles: DEV, SOFTWARE, INGENIERO_MECANICO, SUPERVISOR_HSEQ, CUADRILLA
         /// </summary>
         public string Name { get; set; }
 

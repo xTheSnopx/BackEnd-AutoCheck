@@ -35,4 +35,9 @@ namespace AutoCheckAML.Api.Web.DTOs
         public int? CrewId { get; set; }
         public List<int> RoleIds { get; set; } = new List<int>();
     }
+
+    public class ChangePasswordRequest
+    {
+        public string NewPassword { get; set; }
+    }
 }

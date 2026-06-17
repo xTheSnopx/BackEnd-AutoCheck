@@ -1,0 +1,11 @@
+## Ignore invalid Windows NUL device name files
+**/nul
+nul
+/AutoCheckAML.Api/nul
+
+## Standard .NET build outputs
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates

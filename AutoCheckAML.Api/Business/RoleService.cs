@@ -111,8 +111,17 @@ namespace AutoCheckAML.Api.Business
             IsActive = r.IsActive,
             Permissions = r.RolePermissions?
                 .Where(rp => rp.IsActive && rp.Permission != null)
-                .Select(rp => rp.Permission.Name)
-                .ToList() ?? new List<string>(),
+                .Select(rp => new PermissionDto
+                {
+                    Id = rp.Permission.Id,
+                    Name = rp.Permission.Name,
+                    Description = rp.Permission.Description,
+                    Category = rp.Permission.Category,
+                    IsCritical = rp.Permission.IsCritical,
+                    IsActive = rp.Permission.IsActive,
+                    CreatedAt = rp.Permission.CreatedAt
+                })
+                .ToList() ?? new List<PermissionDto>(),
             CreatedAt = r.CreatedAt
         };
     }

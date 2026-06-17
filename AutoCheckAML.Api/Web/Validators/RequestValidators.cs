@@ -1,4 +1,5 @@
 using AutoCheckAML.Api.Web.DTOs;
+using AutoCheckAML.Api.Helpers;
 using FluentValidation;
 
 namespace AutoCheckAML.Api.Web.Validators
@@ -27,11 +28,15 @@ namespace AutoCheckAML.Api.Web.Validators
             RuleFor(x => x.Username)
                 .NotEmpty().WithMessage("El usuario es requerido")
                 .MinimumLength(3).MaximumLength(50)
-                .Matches(@"^[a-zA-Z0-9_\-]+$").WithMessage("Solo alfanuméricos, guiones y guiones bajos");
+                .Matches(@"^[a-zA-Z0-9_\-]+$").WithMessage("Solo alfanuméricos, guiones y guiones bajos")
+                .Must(username => InputSanitizer.ValidateInput(username).IsValid)
+                .WithMessage("El usuario contiene caracteres no permitidos");
 
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("El email es requerido")
-                .EmailAddress().WithMessage("Email inválido");
+                .EmailAddress().WithMessage("Email inválido")
+                .Must(email => InputSanitizer.ValidateInput(email).IsValid)
+                .WithMessage("El email contiene caracteres no permitidos");
 
             RuleFor(x => x.Password)
                 .NotEmpty().WithMessage("La contraseña es requerida")
@@ -41,7 +46,9 @@ namespace AutoCheckAML.Api.Web.Validators
 
             RuleFor(x => x.FullName)
                 .NotEmpty().WithMessage("El nombre completo es requerido")
-                .MaximumLength(100);
+                .MaximumLength(100)
+                .Must(fullName => InputSanitizer.ValidateInput(fullName).IsValid)
+                .WithMessage("El nombre completo contiene caracteres no permitidos");
         }
     }
 
@@ -54,11 +61,15 @@ namespace AutoCheckAML.Api.Web.Validators
             RuleFor(x => x.Username)
                 .NotEmpty().WithMessage("El usuario es requerido")
                 .MinimumLength(3).MaximumLength(50)
-                .Matches(@"^[a-zA-Z0-9_\-]+$").WithMessage("Solo alfanuméricos, _, -");
+                .Matches(@"^[a-zA-Z0-9_\-]+$").WithMessage("Solo alfanuméricos, _, -")
+                .Must(username => InputSanitizer.ValidateInput(username).IsValid)
+                .WithMessage("El usuario contiene caracteres no permitidos");
 
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("El email es requerido")
-                .EmailAddress().WithMessage("Email inválido");
+                .EmailAddress().WithMessage("Email inválido")
+                .Must(email => InputSanitizer.ValidateInput(email).IsValid)
+                .WithMessage("El email contiene caracteres no permitidos");
 
             RuleFor(x => x.Password)
                 .NotEmpty().WithMessage("La contraseña es requerida")
@@ -69,7 +80,9 @@ namespace AutoCheckAML.Api.Web.Validators
 
             RuleFor(x => x.FullName)
                 .NotEmpty().WithMessage("El nombre completo es requerido")
-                .MaximumLength(100);
+                .MaximumLength(100)
+                .Must(fullName => InputSanitizer.ValidateInput(fullName).IsValid)
+                .WithMessage("El nombre completo contiene caracteres no permitidos");
         }
     }
 
@@ -95,16 +108,22 @@ namespace AutoCheckAML.Api.Web.Validators
         {
             RuleFor(x => x.Name)
                 .NotEmpty().WithMessage("El nombre de la cuadrilla es requerido")
-                .MaximumLength(100);
+                .MaximumLength(100)
+                .Must(name => InputSanitizer.ValidateInput(name).IsValid)
+                .WithMessage("El nombre contiene caracteres no permitidos");
 
             RuleFor(x => x.ManagedByUserId)
                 .GreaterThan(0).WithMessage("Debe especificar un usuario responsable válido");
 
             RuleFor(x => x.Department)
-                .MaximumLength(100);
+                .MaximumLength(100)
+                .Must(dept => string.IsNullOrEmpty(dept) || InputSanitizer.ValidateInput(dept).IsValid)
+                .WithMessage("El departamento contiene caracteres no permitidos");
 
             RuleFor(x => x.Location)
-                .MaximumLength(200);
+                .MaximumLength(200)
+                .Must(loc => string.IsNullOrEmpty(loc) || InputSanitizer.ValidateInput(loc).IsValid)
+                .WithMessage("La ubicación contiene caracteres no permitidos");
         }
     }
 
@@ -119,7 +138,9 @@ namespace AutoCheckAML.Api.Web.Validators
 
             RuleFor(x => x.ActivityLocation)
                 .NotEmpty().WithMessage("La ubicación de actividad es requerida")
-                .MaximumLength(200);
+                .MaximumLength(200)
+                .Must(location => InputSanitizer.ValidateInput(location).IsValid)
+                .WithMessage("La ubicación contiene caracteres no permitidos");
 
             RuleFor(x => x.ActivityDate)
                 .NotEmpty().WithMessage("La fecha de actividad es requerida")

@@ -25,7 +25,7 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Crear un nuevo FormSubmission respondiendo una plantilla.</summary>
         [HttpPost]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
         public async Task<ActionResult<FormSubmissionDto>> Create([FromBody] CreateFormSubmissionRequest request)
         {
             try
@@ -64,7 +64,7 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Actualizar el estado de un formulario.</summary>
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateFormSubmissionStatusRequest request)
         {
             try
@@ -106,15 +106,18 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Exportar formularios a Excel.</summary>
         [HttpGet("export/excel")]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,INGENIERO_HSQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
         public async Task<IActionResult> ExportToExcel([FromQuery] FormSubmissionFilterRequest filter)
         {
             try
             {
+                // Maximum export limit to prevent memory issues
+                const int maxExportSize = 5000;
+
                 var pagedResult = await _formService.GetSubmissionsAsync(GetUserId(), new FormSubmissionFilterRequest
                 {
                     PageNumber = 1,
-                    PageSize = 10000,
+                    PageSize = maxExportSize,
                     FormTemplateId = filter.FormTemplateId,
                     Status = filter.Status,
                     StartDate = filter.StartDate,
@@ -123,6 +126,12 @@ namespace AutoCheckAML.Api.Web.Controllers
 
                 if (!pagedResult.Items.Any())
                     return NotFound(new { message = "No hay datos para exportar." });
+
+                // Warn if there are more records than the export limit
+                if (pagedResult.TotalCount > maxExportSize)
+                {
+                    Response.Headers.Append("X-Export-Warning", $"Solo se exportaron {maxExportSize} de {pagedResult.TotalCount} registros. Aplique filtros para reducir el conjunto de datos.");
+                }
 
                 var bytes = _exportService.ExportFormSubmissionsToExcel(pagedResult.Items);
                 var fileName = $"formularios_{DateTime.Now:yyyy-MM-dd_HH-mm}.xlsx";

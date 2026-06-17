@@ -11,7 +11,7 @@ namespace AutoCheckAML.Api.Web.DTOs
         public int HierarchyLevel { get; set; }
         public bool IsSystemRole { get; set; }
         public bool IsActive { get; set; }
-        public List<string> Permissions { get; set; } = new List<string>();
+        public List<PermissionDto> Permissions { get; set; } = new List<PermissionDto>();
         public DateTime CreatedAt { get; set; }
     }
 

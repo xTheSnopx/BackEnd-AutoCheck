@@ -36,7 +36,7 @@ namespace AutoCheckAML.Api.Web.Controllers
             Ok(await _roleService.GetAllPermissionsAsync());
 
         [HttpPost("{roleId}/permissions/{permissionId}")]
-        [Authorize(Roles = "DEV")]
+        [Authorize(Roles = "DEV,SOFTWARE")]
         public async Task<IActionResult> AssignPermission(int roleId, int permissionId)
         {
             await _roleService.AssignPermissionAsync(roleId, permissionId);
@@ -44,7 +44,7 @@ namespace AutoCheckAML.Api.Web.Controllers
         }
 
         [HttpDelete("{roleId}/permissions/{permissionId}")]
-        [Authorize(Roles = "DEV")]
+        [Authorize(Roles = "DEV,SOFTWARE")]
         public async Task<IActionResult> RevokePermission(int roleId, int permissionId)
         {
             await _roleService.RevokePermissionAsync(roleId, permissionId);

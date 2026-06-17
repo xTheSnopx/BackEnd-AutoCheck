@@ -307,8 +307,9 @@ namespace AutoCheckAML.Api.Data
                 new Role { Id = 1, Name = "DEV", Description = "Desarrollador - Control total del sistema", HierarchyLevel = 0, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
                 new Role { Id = 2, Name = "SOFTWARE", Description = "Administrador de Software - Gestión de usuarios y configuración", HierarchyLevel = 1, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
                 new Role { Id = 3, Name = "INGENIERO_MECANICO", Description = "Ingeniero Mecánico - Responde formularios mecánicos", HierarchyLevel = 2, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Role { Id = 4, Name = "INGENIERO_HSQ", Description = "Ingeniero HSQ - Responde formularios de HSQ", HierarchyLevel = 2, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new Role { Id = 5, Name = "CUADRILLA", Description = "Cuadrilla - Verifica y rectifica información", HierarchyLevel = 3, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow }
+                new Role { Id = 4, Name = "SUPERVISOR_HSEQ", Description = "Supervisor HSEQ - Responde y supervisa formularios de seguridad", HierarchyLevel = 2, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new Role { Id = 5, Name = "CUADRILLA", Description = "Cuadrilla - Verifica y rectifica información", HierarchyLevel = 3, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new Role { Id = 6, Name = "JEFE_MTTO", Description = "Jefe de Mantenimiento - Supervisión general de mantenimiento y flota", HierarchyLevel = 2, IsSystemRole = true, IsActive = true, CreatedAt = DateTime.UtcNow }
             );
         }
 
@@ -402,10 +403,22 @@ namespace AutoCheckAML.Api.Data
                 new RolePermission { RoleId = 5, PermissionId = 13, GrantedAt = DateTime.UtcNow, IsActive = true }  // VIEW_FORM
             };
 
+            // JEFE_MTTO (Rol 6) - Permisos para gestionar formularios y ver reportes
+            var jefeMttoPermissions = new[]
+            {
+                new RolePermission { RoleId = 6, PermissionId = 11, GrantedAt = DateTime.UtcNow, IsActive = true }, // SUBMIT_FORM
+                new RolePermission { RoleId = 6, PermissionId = 12, GrantedAt = DateTime.UtcNow, IsActive = true }, // VERIFY_FORM
+                new RolePermission { RoleId = 6, PermissionId = 13, GrantedAt = DateTime.UtcNow, IsActive = true }, // VIEW_FORM
+                new RolePermission { RoleId = 6, PermissionId = 14, GrantedAt = DateTime.UtcNow, IsActive = true }, // EXPORT_EXCEL
+                new RolePermission { RoleId = 6, PermissionId = 15, GrantedAt = DateTime.UtcNow, IsActive = true }, // EXPORT_PDF
+                new RolePermission { RoleId = 6, PermissionId = 16, GrantedAt = DateTime.UtcNow, IsActive = true }  // VIEW_REPORTS
+            };
+
             var allRolePermissions = devPermissions
                 .Concat(softwarePermissions)
                 .Concat(ingenieroPermissions)
                 .Concat(cuadrillaPermissions)
+                .Concat(jefeMttoPermissions)
                 .ToList();
 
             modelBuilder.Entity<RolePermission>().HasData(allRolePermissions);

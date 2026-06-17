@@ -22,11 +22,13 @@ namespace AutoCheckAML.Api.Business
     {
         private readonly AutoCheckAMLContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuthService(AutoCheckAMLContext context, IConfiguration configuration)
+        public AuthService(AutoCheckAMLContext context, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<LoginResponse> LoginAsync(LoginRequest request)
@@ -39,7 +41,34 @@ namespace AutoCheckAML.Api.Business
                     .ThenInclude(r => r.RolePermissions).ThenInclude(rp => rp.Permission)
                 .FirstOrDefaultAsync(u => u.Username == request.Username && !u.IsDeleted);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null)
+                throw new UnauthorizedAccessException("Usuario o contraseña inválidos.");
+
+            // Verify password - support both BCrypt hash and plain text for database testing
+            bool isPasswordValid = false;
+            try
+            {
+                // Try BCrypt verification first
+                isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            }
+            catch (Exception)
+            {
+                // If BCrypt fails, check if it's plain text (for database testing/development)
+                // BCrypt hashes are always 60 characters, so if it's shorter, it might be plain text
+                if (user.PasswordHash.Length < 60)
+                {
+                    isPasswordValid = user.PasswordHash == request.Password;
+
+                    // If plain text matches, auto-upgrade to BCrypt hash
+                    if (isPasswordValid)
+                    {
+                        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+
+            if (!isPasswordValid)
                 throw new UnauthorizedAccessException("Usuario o contraseña inválidos.");
 
             if (!user.IsActive)
@@ -71,7 +100,7 @@ namespace AutoCheckAML.Api.Business
                 Token = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedAt = DateTime.UtcNow,
-                IssuedFromIp = "0.0.0.0"
+                IssuedFromIp = GetClientIpAddress()
             });
             await _context.SaveChangesAsync();
 
@@ -197,7 +226,7 @@ namespace AutoCheckAML.Api.Business
 
         private string GenerateAccessToken(User user, List<string> roles, List<string> permissions)
         {
-            var jwtSecret = _configuration["Jwt:Secret"];
+            var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? _configuration["Jwt:Secret"];
             var jwtIssuer = _configuration["Jwt:Issuer"];
             var jwtAudience = _configuration["Jwt:Audience"];
 
@@ -237,6 +266,32 @@ namespace AutoCheckAML.Api.Business
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomBytes);
             return Convert.ToBase64String(randomBytes);
+        }
+
+        private string GetClientIpAddress()
+        {
+            try
+            {
+                var httpContext = _httpContextAccessor.HttpContext;
+                if (httpContext == null)
+                    return "Unknown";
+
+                // Check for forwarded IP (when behind proxy/load balancer)
+                var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(forwardedFor))
+                {
+                    var ips = forwardedFor.Split(',');
+                    if (ips.Length > 0)
+                        return ips[0].Trim();
+                }
+
+                // Get direct connection IP
+                return httpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+            }
+            catch
+            {
+                return "Unknown";
+            }
         }
     }
 }
