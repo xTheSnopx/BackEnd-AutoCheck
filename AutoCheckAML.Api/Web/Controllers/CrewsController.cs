@@ -33,7 +33,7 @@ namespace AutoCheckAML.Api.Web.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<ActionResult<CrewDto>> Create([FromBody] CreateCrewRequest request)
         {
             try
@@ -46,7 +46,7 @@ namespace AutoCheckAML.Api.Web.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<ActionResult<CrewDto>> Update(int id, [FromBody] UpdateCrewRequest request)
         {
             try { return Ok(await _crewService.UpdateAsync(id, request)); }
@@ -55,7 +55,7 @@ namespace AutoCheckAML.Api.Web.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -71,7 +71,7 @@ namespace AutoCheckAML.Api.Web.Controllers
             Ok(await _crewService.GetMembersAsync(id));
 
         [HttpPost("{id}/members/{userId}")]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<IActionResult> AddMember(int id, int userId)
         {
             try
@@ -83,7 +83,7 @@ namespace AutoCheckAML.Api.Web.Controllers
         }
 
         [HttpDelete("{id}/members/{userId}")]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<IActionResult> RemoveMember(int id, int userId)
         {
             await _crewService.RemoveMemberAsync(id, userId);

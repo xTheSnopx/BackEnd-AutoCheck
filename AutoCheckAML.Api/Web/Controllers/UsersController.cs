@@ -24,7 +24,7 @@ namespace AutoCheckAML.Api.Web.Controllers
             int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
         [HttpGet]
-        [Authorize(Roles = "DEV,SOFTWARE")]
+        [Authorize(Roles = "DEV,SOFTWARE,JEFE_MTTO")]
         public async Task<ActionResult<List<UserDto>>> GetAll() =>
             Ok(await _userService.GetAllAsync());
 
