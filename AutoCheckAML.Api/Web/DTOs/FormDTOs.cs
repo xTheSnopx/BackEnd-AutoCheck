@@ -60,10 +60,10 @@ namespace AutoCheckAML.Api.Web.DTOs
         public int? FormTemplateId { get; set; }
         public int? SubmittedByUserId { get; set; }
         public int? AssignedToCrewId { get; set; }
-        public string Status { get; set; }
+        public string? Status { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
-        public string ActivityLocation { get; set; }
+        public string? ActivityLocation { get; set; }
         public int PageNumber { get; set; } = 1;
         public int PageSize { get; set; } = 10;
     }
@@ -84,8 +84,8 @@ namespace AutoCheckAML.Api.Web.DTOs
 
     public class FormFilterRequest
     {
-        public string SearchTerm { get; set; }
-        public string Status { get; set; }
+        public string? SearchTerm { get; set; }
+        public string? Status { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int PageNumber { get; set; } = 1;

@@ -37,12 +37,12 @@ namespace AutoCheckAML.Api.Entity
         /// <summary>
         /// Observaciones adicionales del respondedor.
         /// </summary>
-        public string ObservationsByRespondent { get; set; }
+        public string ObservationsByRespondent { get; set; } = string.Empty;
 
         /// <summary>
         /// Observaciones de la cuadrilla al verificar/rectificar.
         /// </summary>
-        public string ObservationsByRectifier { get; set; }
+        public string ObservationsByRectifier { get; set; } = string.Empty;
 
         /// <summary>
         /// Fecha de verificación por la cuadrilla.

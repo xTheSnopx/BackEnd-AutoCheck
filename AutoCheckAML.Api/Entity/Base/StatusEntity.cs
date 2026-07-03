@@ -16,7 +16,7 @@ namespace AutoCheckAML.Api.Entity.Base
         /// <summary>
         /// Comentario o notas sobre el cambio de estado.
         /// </summary>
-        public string StatusComment { get; set; }
+        public string StatusComment { get; set; } = string.Empty;
 
         /// <summary>
         /// Fecha de la última transición de estado.

@@ -25,7 +25,7 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Crear un nuevo FormSubmission respondiendo una plantilla.</summary>
         [HttpPost]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ,CUADRILLA")]
         public async Task<ActionResult<FormSubmissionDto>> Create([FromBody] CreateFormSubmissionRequest request)
         {
             try
@@ -64,7 +64,7 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Actualizar el estado de un formulario.</summary>
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ,JEFE_MTTO")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateFormSubmissionStatusRequest request)
         {
             try
@@ -106,7 +106,7 @@ namespace AutoCheckAML.Api.Web.Controllers
 
         /// <summary>Exportar formularios a Excel.</summary>
         [HttpGet("export/excel")]
-        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ,JEFE_MTTO")]
         public async Task<IActionResult> ExportToExcel([FromQuery] FormSubmissionFilterRequest filter)
         {
             try
