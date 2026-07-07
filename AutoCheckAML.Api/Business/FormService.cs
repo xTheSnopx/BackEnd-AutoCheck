@@ -42,10 +42,12 @@ namespace AutoCheckAML.Api.Business
     public class FormService : IFormService
     {
         private readonly AutoCheckAMLContext _context;
+        private readonly IAuditService _auditService;
 
-        public FormService(AutoCheckAMLContext context)
+        public FormService(AutoCheckAMLContext context, IAuditService auditService)
         {
             _context = context;
+            _auditService = auditService;
         }
 
         public async Task<FormSubmissionDto> CreateSubmissionAsync(int userId, CreateFormSubmissionRequest request)
@@ -320,6 +322,7 @@ namespace AutoCheckAML.Api.Business
             // Si ambos aprobaron (o es admin sobreescribiendo), estado = OPERATIVO
             bool ingenieroOk = submission.ApprovedByIngenieroId.HasValue;
             bool supervisorOk = submission.ApprovedBySupervisorId.HasValue;
+            var oldStatus = submission.Status;
 
             if (ingenieroOk && supervisorOk)
             {
@@ -333,6 +336,19 @@ namespace AutoCheckAML.Api.Business
             }
 
             await _context.SaveChangesAsync();
+
+            // Registrar en auditoría
+            var roleApprover = isIngeniero ? "INGENIERO_MECANICO" : (isSupervisor ? "SUPERVISOR_HSEQ" : "ADMIN");
+            await _auditService.LogAsync(
+                userId,
+                "FormSubmission",
+                formId,
+                "Approve",
+                $"Aprobación de inspección por {roleApprover}. Estado: {oldStatus} -> {submission.Status}",
+                oldValues: $"{{\"Status\": \"{oldStatus}\"}}",
+                newValues: $"{{\"Status\": \"{submission.Status}\", \"ApprovedBy\": \"{roleApprover}\"}}"
+            );
+
             return result;
         }
 
@@ -367,6 +383,7 @@ namespace AutoCheckAML.Api.Business
             }
 
             // Si alguien rechaza, el vehículo queda INOPERATIVO
+            var oldStatus = submission.Status;
             submission.Status = "INOPERATIVO";
             submission.ObservationsByRectifier = string.IsNullOrEmpty(submission.ObservationsByRectifier)
                 ? $"Rechazado: {reason}"
@@ -379,6 +396,19 @@ namespace AutoCheckAML.Api.Business
             submission.ApprovedBySupervisorAt = null;
 
             await _context.SaveChangesAsync();
+
+            // Registrar en auditoría
+            var roleRejector = isIngeniero ? "INGENIERO_MECANICO" : (isSupervisor ? "SUPERVISOR_HSEQ" : "ADMIN");
+            await _auditService.LogAsync(
+                userId,
+                "FormSubmission",
+                formId,
+                "Reject",
+                $"Rechazo de inspección por {roleRejector}. Motivo: {reason}",
+                oldValues: $"{{\"Status\": \"{oldStatus}\"}}",
+                newValues: $"{{\"Status\": \"INOPERATIVO\", \"RejectedBy\": \"{roleRejector}\", \"Reason\": \"{reason}\"}}"
+            );
+
             return result + " Vehículo marcado como INOPERATIVO.";
         }
 
@@ -402,6 +432,8 @@ namespace AutoCheckAML.Api.Business
             if (!isIngeniero && !isAdmin)
                 throw new InvalidOperationException("Solo el Ingeniero Mecánico puede modificar el estado de revisión.");
 
+            var oldStatus = submission.Status;
+
             if (inRevision)
             {
                 submission.Status = "EN REVISION";
@@ -412,12 +444,36 @@ namespace AutoCheckAML.Api.Business
                 submission.ApprovedBySupervisorAt = null;
 
                 await _context.SaveChangesAsync();
+
+                // Registrar en auditoría
+                await _auditService.LogAsync(
+                    userId,
+                    "FormSubmission",
+                    formId,
+                    "SetRevision",
+                    $"Vehículo puesto EN REVISIÓN (estado anterior: {oldStatus})",
+                    oldValues: $"{{\"Status\": \"{oldStatus}\"}}",
+                    newValues: "{\"Status\": \"EN REVISION\"}"
+                );
+
                 return "Vehículo puesto EN REVISIÓN. Ambos deben aprobar nuevamente.";
             }
             else
             {
                 submission.Status = "Pendiente";
                 await _context.SaveChangesAsync();
+
+                // Registrar en auditoría
+                await _auditService.LogAsync(
+                    userId,
+                    "FormSubmission",
+                    formId,
+                    "RemoveRevision",
+                    $"Vehículo quitado de revisión (estado anterior: {oldStatus})",
+                    oldValues: $"{{\"Status\": \"{oldStatus}\"}}",
+                    newValues: "{\"Status\": \"Pendiente\"}"
+                );
+
                 return "Vehículo quitado de revisión. Ahora puede ser aprobado.";
             }
         }
