@@ -51,6 +51,7 @@ foreach (var type in validatorTypes)
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Add Business Services
+builder.Services.AddScoped<IAuditService, AuditService>();  // Debe ir antes de AuthService
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<IExportService, ExportService>();

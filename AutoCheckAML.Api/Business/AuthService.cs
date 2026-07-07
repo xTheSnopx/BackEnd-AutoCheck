@@ -23,12 +23,15 @@ namespace AutoCheckAML.Api.Business
         private readonly AutoCheckAMLContext _context;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IAuditService _auditService;
 
-        public AuthService(AutoCheckAMLContext context, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
+        public AuthService(AutoCheckAMLContext context, IConfiguration configuration,
+            IHttpContextAccessor httpContextAccessor, IAuditService auditService)
         {
             _context = context;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
+            _auditService = auditService;
         }
 
         public async Task<LoginResponse> LoginAsync(LoginRequest request)
@@ -94,15 +97,21 @@ namespace AutoCheckAML.Api.Business
             var refreshToken = GenerateRefreshToken();
 
             // Guardar refresh token en BD
+            var clientIp = GetClientIpAddress();
+            var userAgent = GetUserAgent();
+
             _context.RefreshTokens.Add(new RefreshToken
             {
                 UserId = user.Id,
                 Token = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedAt = DateTime.UtcNow,
-                IssuedFromIp = GetClientIpAddress()
+                IssuedFromIp = clientIp
             });
             await _context.SaveChangesAsync();
+
+            // Registrar auditoría de login exitoso
+            await _auditService.LogLoginAsync(user.Id, clientIp, userAgent, success: true);
 
             return new LoginResponse
             {
@@ -287,6 +296,19 @@ namespace AutoCheckAML.Api.Business
 
                 // Get direct connection IP
                 return httpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private string GetUserAgent()
+        {
+            try
+            {
+                var httpContext = _httpContextAccessor.HttpContext;
+                return httpContext?.Request.Headers["User-Agent"].FirstOrDefault() ?? "Unknown";
             }
             catch
             {

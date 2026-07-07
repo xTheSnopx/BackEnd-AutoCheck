@@ -101,6 +101,14 @@ namespace AutoCheckAML.Api.Business
             if (user == null)
                 throw new KeyNotFoundException($"Usuario {id} no encontrado.");
 
+            // Validar si el nuevo username ya existe (si se está cambiando)
+            if (!string.IsNullOrEmpty(request.Username) && request.Username != user.Username)
+            {
+                if (await _context.Users.AnyAsync(u => u.Username == request.Username && u.Id != id))
+                    throw new InvalidOperationException("El nombre de usuario ya existe.");
+            }
+
+            user.Username = request.Username ?? user.Username;
             user.Email = request.Email ?? user.Email;
             user.FullName = request.FullName ?? user.FullName;
             user.IsActive = request.IsActive;
