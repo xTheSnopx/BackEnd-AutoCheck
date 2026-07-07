@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AutoCheckAML.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6ff3cb60241b823b1108d7313c8bc12e7ba7c14d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e1fb907fcb0728c7f9a2588effa1ea07fb27348f")]
 [assembly: System.Reflection.AssemblyProductAttribute("AutoCheckAML.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AutoCheckAML.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

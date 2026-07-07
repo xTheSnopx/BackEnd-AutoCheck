@@ -39,6 +39,11 @@ namespace AutoCheckAML.Api.Entity
         public int DisplayOrder { get; set; }
 
         /// <summary>
+        /// Categoría de sección: doc, op, veh, ev
+        /// </summary>
+        public string Category { get; set; } = "doc";
+
+        /// <summary>
         /// Opciones para campos Select/Radio (JSON).
         /// Formato: [{"value": "opcion1", "label": "Opción 1"}, ...]
         /// </summary>

@@ -90,7 +90,54 @@ namespace AutoCheckAML.Api.Web.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        /// <summary>Eliminar un formulario (solo DEV/SOFTWARE).</summary>
+        /// <summary>Aprobar inspección por rol específico (doble aprobación).</summary>
+        [HttpPut("{id}/approve")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
+        public async Task<IActionResult> Approve(int id)
+        {
+            try
+            {
+                var result = await _formService.ApproveSubmissionAsync(GetUserId(), id);
+                return Ok(new { message = result });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>Rechazar inspección (vehículo queda INOPERATIVO).</summary>
+        [HttpPut("{id}/reject")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ")]
+        public async Task<IActionResult> Reject(int id, [FromBody] RejectSubmissionRequest request)
+        {
+            try
+            {
+                var result = await _formService.RejectSubmissionAsync(GetUserId(), id, request.Reason ?? "Sin motivo especificado");
+                return Ok(new { message = result });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>Poner/quitar inspección EN REVISIÓN (solo Ingeniero Mecánico).</summary>
+        [HttpPut("{id}/revision")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO")]
+        public async Task<IActionResult> SetRevision(int id, [FromBody] SetRevisionRequest request)
+        {
+            try
+            {
+                var result = await _formService.SetRevisionStatusAsync(GetUserId(), id, request.InRevision);
+                return Ok(new { message = result });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Eliminar un formulario (solo DEV/SOFTWARE/Admin).
+        /// </summary>
         [HttpDelete("{id}")]
         [Authorize(Roles = "DEV,SOFTWARE")]
         public async Task<IActionResult> Delete(int id)
@@ -98,7 +145,7 @@ namespace AutoCheckAML.Api.Web.Controllers
             try
             {
                 await _formService.DeleteSubmissionAsync(GetUserId(), id);
-                return Ok(new { message = "Formulario eliminado." });
+                return Ok(new { message = "Formulario eliminado exitosamente." });
             }
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
@@ -136,6 +183,40 @@ namespace AutoCheckAML.Api.Web.Controllers
                 var bytes = _exportService.ExportFormSubmissionsToExcel(pagedResult.Items);
                 var fileName = $"formularios_{DateTime.Now:yyyy-MM-dd_HH-mm}.xlsx";
                 return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>Exportar formularios a PDF.</summary>
+        [HttpGet("export/pdf")]
+        [Authorize(Roles = "DEV,SOFTWARE,INGENIERO_MECANICO,SUPERVISOR_HSEQ,JEFE_MTTO")]
+        public async Task<IActionResult> ExportToPdf([FromQuery] FormSubmissionFilterRequest filter)
+        {
+            try
+            {
+                const int maxExportSize = 5000;
+
+                var pagedResult = await _formService.GetSubmissionsAsync(GetUserId(), new FormSubmissionFilterRequest
+                {
+                    PageNumber = 1,
+                    PageSize = maxExportSize,
+                    FormTemplateId = filter.FormTemplateId,
+                    Status = filter.Status,
+                    StartDate = filter.StartDate,
+                    EndDate = filter.EndDate
+                });
+
+                if (!pagedResult.Items.Any())
+                    return NotFound(new { message = "No hay datos para exportar." });
+
+                if (pagedResult.TotalCount > maxExportSize)
+                {
+                    Response.Headers.Append("X-Export-Warning", $"Solo se exportaron {maxExportSize} de {pagedResult.TotalCount} registros. Aplique filtros para reducir el conjunto de datos.");
+                }
+
+                var bytes = _exportService.ExportFormSubmissionsToPdf(pagedResult.Items);
+                var fileName = $"formularios_{DateTime.Now:yyyy-MM-dd_HH-mm}.pdf";
+                return File(bytes, "application/pdf", fileName);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

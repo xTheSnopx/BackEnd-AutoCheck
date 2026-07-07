@@ -60,6 +60,11 @@ namespace AutoCheckAML.Api.Entity
         public bool RequiresReview { get; set; } = false;
 
         /// <summary>
+        /// ID del tipo de vehículo seleccionado (opcional).
+        /// </summary>
+        public int? VehicleTypeId { get; set; }
+
+        /// <summary>
         /// Fecha de cierre del formulario.
         /// </summary>
         public DateTime? ClosedAt { get; set; }
@@ -69,12 +74,34 @@ namespace AutoCheckAML.Api.Entity
         /// </summary>
         public int? ClosedByUserId { get; set; }
 
+        // ===== DOUBLE APPROVAL FIELDS =====
+        /// <summary>
+        /// ID del Ingeniero Mecánico que aprobó la inspección.
+        /// </summary>
+        public int? ApprovedByIngenieroId { get; set; }
+
+        /// <summary>
+        /// Fecha de aprobación por el Ingeniero Mecánico.
+        /// </summary>
+        public DateTime? ApprovedByIngenieroAt { get; set; }
+
+        /// <summary>
+        /// ID del Supervisor HSEQ que aprobó la inspección.
+        /// </summary>
+        public int? ApprovedBySupervisorId { get; set; }
+
+        /// <summary>
+        /// Fecha de aprobación por el Supervisor HSEQ.
+        /// </summary>
+        public DateTime? ApprovedBySupervisorAt { get; set; }
+
         // Navigation properties
         public virtual FormTemplate FormTemplate { get; set; }
         public virtual User SubmittedByUser { get; set; }
         public virtual User VerifiedByUser { get; set; }
         public virtual User ClosedByUser { get; set; }
         public virtual Crew AssignedToCrew { get; set; }
+        public virtual VehicleType VehicleType { get; set; }
         public virtual ICollection<Answer> Answers { get; set; } = new List<Answer>();
         public virtual ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
     }

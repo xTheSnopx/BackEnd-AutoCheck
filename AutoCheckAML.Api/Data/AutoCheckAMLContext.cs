@@ -31,6 +31,7 @@ namespace AutoCheckAML.Api.Data
         public DbSet<FormSubmission> FormSubmissions { get; set; }
         public DbSet<Answer> Answers { get; set; }
         public DbSet<Attachment> Attachments { get; set; }
+        public DbSet<VehicleType> VehicleTypes { get; set; }
 
         // ========== ENTIDADES DE AUDITORÍA Y EXPORTACIÓN ==========
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -199,7 +200,12 @@ namespace AutoCheckAML.Api.Data
                 .HasForeignKey(eh => eh.ExportedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ========== ÍNDICES ==========
+            // FormSubmission -> VehicleType
+            modelBuilder.Entity<FormSubmission>()
+                .HasOne(fs => fs.VehicleType)
+                .WithMany()
+                .HasForeignKey(fs => fs.VehicleTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // User índices
             modelBuilder.Entity<User>()
@@ -263,6 +269,14 @@ namespace AutoCheckAML.Api.Data
             modelBuilder.Entity<FormSubmission>()
                 .HasIndex(fs => new { fs.SubmittedByUserId, fs.CreatedAt });
 
+            // VehicleType índices
+            modelBuilder.Entity<VehicleType>()
+                .HasIndex(v => v.Name)
+                .IsUnique();
+
+            modelBuilder.Entity<VehicleType>()
+                .HasIndex(v => v.IsActive);
+
             // RefreshToken índices
             modelBuilder.Entity<RefreshToken>()
                 .HasIndex(rt => rt.Token)
@@ -292,10 +306,26 @@ namespace AutoCheckAML.Api.Data
                 .HasIndex(eh => eh.CreatedAt);
 
             // ========== SEED DATA ==========
+            SeedVehicleTypes(modelBuilder);
             SeedRoles(modelBuilder);
             SeedPermissions(modelBuilder);
             SeedRolePermissions(modelBuilder);
             SeedAdminUser(modelBuilder);
+        }
+
+        /// <summary>
+        /// Siembra datos iniciales de tipos de vehículos.
+        /// </summary>
+        private void SeedVehicleTypes(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<VehicleType>().HasData(
+                new VehicleType { Id = 1, Name = "Camioneta", Description = "Vehículo utilitario ligero", DisplayOrder = 1, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new VehicleType { Id = 2, Name = "Camión", Description = "Vehículo de carga pesada", DisplayOrder = 2, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new VehicleType { Id = 3, Name = "Volqueta", Description = "Vehículo de volteo para materiales", DisplayOrder = 3, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new VehicleType { Id = 4, Name = "Automóvil", Description = "Vehículo de pasajeros", DisplayOrder = 4, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new VehicleType { Id = 5, Name = "Moto", Description = "Motocicleta", DisplayOrder = 5, IsActive = true, CreatedAt = DateTime.UtcNow },
+                new VehicleType { Id = 6, Name = "Maquinaria Pesada", Description = "Excavadoras, retroexcavadoras, etc.", DisplayOrder = 6, IsActive = true, CreatedAt = DateTime.UtcNow }
+            );
         }
 
         /// <summary>

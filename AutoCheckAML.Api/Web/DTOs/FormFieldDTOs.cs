@@ -15,6 +15,9 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string ValidationRules { get; set; }
         public string DefaultValue { get; set; }
         public bool IsActive { get; set; }
+        public string? VehicleTypeId { get; set; }
+        public string? VehicleTypeName { get; set; }
+        public string Category { get; set; } = "doc";
         public DateTime CreatedAt { get; set; }
     }
 
@@ -28,6 +31,8 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string Options { get; set; }
         public string ValidationRules { get; set; }
         public string DefaultValue { get; set; }
+        public string? VehicleTypeId { get; set; }
+        public string Category { get; set; } = "doc";
     }
 
     public class UpdateFormFieldRequest
@@ -42,5 +47,7 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string ValidationRules { get; set; }
         public string DefaultValue { get; set; }
         public bool IsActive { get; set; }
+        public string? VehicleTypeId { get; set; }
+        public string Category { get; set; } = "doc";
     }
 }

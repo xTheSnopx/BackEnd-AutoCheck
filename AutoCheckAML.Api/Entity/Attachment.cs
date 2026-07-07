@@ -34,8 +34,13 @@ namespace AutoCheckAML.Api.Entity
         public long FileSize { get; set; }
 
         /// <summary>
-        /// Ruta o URI del archivo almacenado.
-        /// Puede ser local, en blob storage, S3, etc.
+        /// Datos binarios del archivo almacenados directamente en la base de datos.
+        /// Permite que las fotos viajen junto con la base de datos al subirla a un servicio gratuito.
+        /// </summary>
+        public byte[] FileData { get; set; }
+
+        /// <summary>
+        /// Ruta o URI del archivo almacenado (legacy).
         /// </summary>
         public string FilePath { get; set; }
 

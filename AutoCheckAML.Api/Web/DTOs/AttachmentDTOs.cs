@@ -12,6 +12,8 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string ContentType { get; set; }
         public long FileSize { get; set; }
         public string FilePath { get; set; }
+        /// <summary>Datos base64 para enviar al frontend.</summary>
+        public string FileDataBase64 { get; set; }
         public string Description { get; set; }
         public string EvidenceType { get; set; }
         public int UploadedByUserId { get; set; }

@@ -25,7 +25,18 @@ namespace AutoCheckAML.Api.Web.DTOs
         public bool RequiresClosure { get; set; }
         public string Status { get; set; }
         public List<AnswerDto> Answers { get; set; } = new List<AnswerDto>();
+        public List<AttachmentDto> Attachments { get; set; } = new List<AttachmentDto>();
+        public int? VehicleTypeId { get; set; }
+        public string VehicleTypeName { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        // Double approval fields
+        public int? ApprovedByIngenieroId { get; set; }
+        public string ApprovedByIngenieroName { get; set; }
+        public DateTime? ApprovedByIngenieroAt { get; set; }
+        public int? ApprovedBySupervisorId { get; set; }
+        public string ApprovedBySupervisorName { get; set; }
+        public DateTime? ApprovedBySupervisorAt { get; set; }
     }
 
     /// <summary>Request para crear un nuevo FormSubmission.</summary>
@@ -33,9 +44,12 @@ namespace AutoCheckAML.Api.Web.DTOs
     {
         public int FormTemplateId { get; set; }
         public int? AssignedToCrewId { get; set; }
+        public int? VehicleTypeId { get; set; }
         public string ActivityLocation { get; set; }
         public DateTime ActivityDate { get; set; }
         public string ObservationsByRespondent { get; set; }
+        public string? PhotoData { get; set; }
+        public List<string> Photos { get; set; } = new List<string>();
         public List<CreateAnswerRequest> Answers { get; set; } = new List<CreateAnswerRequest>();
     }
 
@@ -51,6 +65,18 @@ namespace AutoCheckAML.Api.Web.DTOs
     {
         public string ObservationsByRectifier { get; set; }
         public bool RequiresReview { get; set; }
+    }
+
+    /// <summary>Request para rechazar una inspección.</summary>
+    public class RejectSubmissionRequest
+    {
+        public string Reason { get; set; }
+    }
+
+    /// <summary>Request para poner/quitar una inspección EN REVISIÓN.</summary>
+    public class SetRevisionRequest
+    {
+        public bool InRevision { get; set; }
     }
 
     // ========== FILTER / PAGING ==========
