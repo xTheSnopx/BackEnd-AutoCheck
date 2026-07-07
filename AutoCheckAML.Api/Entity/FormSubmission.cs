@@ -74,7 +74,7 @@ namespace AutoCheckAML.Api.Entity
         /// </summary>
         public int? ClosedByUserId { get; set; }
 
-        // ===== DOUBLE APPROVAL FIELDS =====
+        // ===== APPROVAL & HSEQ REVIEW FIELDS =====
         /// <summary>
         /// ID del Ingeniero Mecánico que aprobó la inspección.
         /// </summary>
@@ -86,13 +86,22 @@ namespace AutoCheckAML.Api.Entity
         public DateTime? ApprovedByIngenieroAt { get; set; }
 
         /// <summary>
-        /// ID del Supervisor HSEQ que aprobó la inspección.
+        /// ID del Supervisor HSEQ que revisó la inspección (no afecta estado).
         /// </summary>
-        public int? ApprovedBySupervisorId { get; set; }
+        public int? ReviewedByHSEQId { get; set; }
 
         /// <summary>
-        /// Fecha de aprobación por el Supervisor HSEQ.
+        /// Fecha de revisión por el Supervisor HSEQ.
         /// </summary>
+        public DateTime? ReviewedByHSEQAt { get; set; }
+
+        /// <summary>
+        /// Observaciones del Supervisor HSEQ durante su revisión.
+        /// </summary>
+        public string ObservationsByHSEQ { get; set; } = string.Empty;
+
+        // DEPRECATED: Mantener por compatibilidad pero ya no se usa para el flujo
+        public int? ApprovedBySupervisorId { get; set; }
         public DateTime? ApprovedBySupervisorAt { get; set; }
 
         // Navigation properties

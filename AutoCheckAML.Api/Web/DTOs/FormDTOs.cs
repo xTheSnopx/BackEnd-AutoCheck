@@ -30,10 +30,18 @@ namespace AutoCheckAML.Api.Web.DTOs
         public string VehicleTypeName { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        // Double approval fields
+        // Approval fields (solo Ingeniero Mecánico aprueba)
         public int? ApprovedByIngenieroId { get; set; }
         public string ApprovedByIngenieroName { get; set; }
         public DateTime? ApprovedByIngenieroAt { get; set; }
+
+        // HSEQ Review fields (revisión sin afectar estado)
+        public int? ReviewedByHSEQId { get; set; }
+        public string ReviewedByHSEQName { get; set; }
+        public DateTime? ReviewedByHSEQAt { get; set; }
+        public string ObservationsByHSEQ { get; set; }
+
+        // DEPRECATED: Mantener por compatibilidad
         public int? ApprovedBySupervisorId { get; set; }
         public string ApprovedBySupervisorName { get; set; }
         public DateTime? ApprovedBySupervisorAt { get; set; }
@@ -77,6 +85,12 @@ namespace AutoCheckAML.Api.Web.DTOs
     public class SetRevisionRequest
     {
         public bool InRevision { get; set; }
+    }
+
+    /// <summary>Request para registrar una revisión del Supervisor HSEQ.</summary>
+    public class HSEQReviewRequest
+    {
+        public string Observations { get; set; }
     }
 
     // ========== FILTER / PAGING ==========

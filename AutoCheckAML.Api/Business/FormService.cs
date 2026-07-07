@@ -19,6 +19,7 @@ namespace AutoCheckAML.Api.Business
         Task<string> ApproveSubmissionAsync(int userId, int formId);
         Task<string> RejectSubmissionAsync(int userId, int formId, string reason);
         Task<string> SetRevisionStatusAsync(int userId, int formId, bool inRevision);
+        Task<string> RegisterHSEQReviewAsync(int userId, int formId, string observations);
 
         // Template / Field management
         Task<List<FormFieldDto>> GetTemplateFieldsAsync(int templateId);
@@ -293,63 +294,83 @@ namespace AutoCheckAML.Api.Business
                 .ToListAsync();
 
             bool isIngeniero = userRoles.Contains("INGENIERO_MECANICO");
-            bool isSupervisor = userRoles.Contains("SUPERVISOR_HSEQ");
             bool isAdmin = userRoles.Contains("DEV") || userRoles.Contains("SOFTWARE");
 
-            string result = "";
+            // Solo Ingeniero Mecánico o Admin pueden aprobar (ya no Supervisor HSEQ)
+            if (!isIngeniero && !isAdmin)
+                throw new InvalidOperationException("Solo el Ingeniero Mecánico puede aprobar inspecciones.");
 
-            if (isIngeniero || isAdmin)
-            {
-                if (submission.ApprovedByIngenieroId.HasValue && !isAdmin)
-                    throw new InvalidOperationException("Esta inspección ya fue aprobada por un Ingeniero Mecánico.");
-                submission.ApprovedByIngenieroId = userId;
-                submission.ApprovedByIngenieroAt = DateTime.UtcNow;
-                result = "Ingeniero Mecánico aprobó la inspección.";
-            }
-            else if (isSupervisor || isAdmin)
-            {
-                if (submission.ApprovedBySupervisorId.HasValue && !isAdmin)
-                    throw new InvalidOperationException("Esta inspección ya fue aprobada por un Supervisor HSEQ.");
-                submission.ApprovedBySupervisorId = userId;
-                submission.ApprovedBySupervisorAt = DateTime.UtcNow;
-                result = "Supervisor HSEQ aprobó la inspección.";
-            }
-            else
-            {
-                throw new InvalidOperationException("No tiene permisos para aprobar inspecciones.");
-            }
+            if (submission.ApprovedByIngenieroId.HasValue && !isAdmin)
+                throw new InvalidOperationException("Esta inspección ya fue aprobada por un Ingeniero Mecánico.");
 
-            // Si ambos aprobaron (o es admin sobreescribiendo), estado = OPERATIVO
-            bool ingenieroOk = submission.ApprovedByIngenieroId.HasValue;
-            bool supervisorOk = submission.ApprovedBySupervisorId.HasValue;
             var oldStatus = submission.Status;
-
-            if (ingenieroOk && supervisorOk)
-            {
-                submission.Status = "OPERATIVO";
-                result += " Vehículo OPERATIVO (ambas aprobaciones completas).";
-            }
-            else
-            {
-                submission.Status = "Pendiente";
-                result += " Pendiente aprobación del " + (ingenieroOk ? "Supervisor HSEQ" : "Ingeniero Mecánico") + ".";
-            }
+            submission.ApprovedByIngenieroId = userId;
+            submission.ApprovedByIngenieroAt = DateTime.UtcNow;
+            submission.Status = "OPERATIVO";  // Con solo Ingeniero aprobando, pasa a OPERATIVO
 
             await _context.SaveChangesAsync();
 
             // Registrar en auditoría
-            var roleApprover = isIngeniero ? "INGENIERO_MECANICO" : (isSupervisor ? "SUPERVISOR_HSEQ" : "ADMIN");
             await _auditService.LogAsync(
                 userId,
                 "FormSubmission",
                 formId,
                 "Approve",
-                $"Aprobación de inspección por {roleApprover}. Estado: {oldStatus} -> {submission.Status}",
+                $"Aprobación de inspección por Ingeniero Mecánico. Estado: {oldStatus} -> OPERATIVO",
                 oldValues: $"{{\"Status\": \"{oldStatus}\"}}",
-                newValues: $"{{\"Status\": \"{submission.Status}\", \"ApprovedBy\": \"{roleApprover}\"}}"
+                newValues: "{\"Status\": \"OPERATIVO\", \"ApprovedBy\": \"INGENIERO_MECANICO\"}"
             );
 
-            return result;
+            return "Ingeniero Mecánico aprobó la inspección. Vehículo OPERATIVO.";
+        }
+
+        /// <summary>
+        /// Registra una revisión del Supervisor HSEQ (no cambia el estado del vehículo).
+        /// </summary>
+        public async Task<string> RegisterHSEQReviewAsync(int userId, int formId, string observations)
+        {
+            var submission = await _context.FormSubmissions
+                .FirstOrDefaultAsync(fs => fs.Id == formId);
+            if (submission == null)
+                throw new KeyNotFoundException("Formulario no encontrado.");
+
+            var userRoles = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == userId && ur.IsActive)
+                .Select(ur => ur.Role.Name)
+                .ToListAsync();
+
+            bool isSupervisor = userRoles.Contains("SUPERVISOR_HSEQ");
+            bool isAdmin = userRoles.Contains("DEV") || userRoles.Contains("SOFTWARE");
+
+            if (!isSupervisor && !isAdmin)
+                throw new InvalidOperationException("Solo el Supervisor HSEQ puede registrar revisiones.");
+
+            // Guardar la revisión (puede hacerse múltiples veces, se acumula)
+            var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+            var newObservation = $"[{timestamp}] {observations}";
+
+            if (string.IsNullOrEmpty(submission.ObservationsByHSEQ))
+                submission.ObservationsByHSEQ = newObservation;
+            else
+                submission.ObservationsByHSEQ += "\n" + newObservation;
+
+            submission.ReviewedByHSEQId = userId;
+            submission.ReviewedByHSEQAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Registrar en auditoría
+            await _auditService.LogAsync(
+                userId,
+                "FormSubmission",
+                formId,
+                "HSEQReview",
+                $"Revisión HSEQ registrada: {observations}",
+                newValues: $"{{\"ObservationsByHSEQ\": \"{observations}\"}}"
+            );
+
+            return "Revisión HSEQ registrada correctamente.";
         }
 
         public async Task<string> RejectSubmissionAsync(int userId, int formId, string reason)
@@ -854,6 +875,11 @@ namespace AutoCheckAML.Api.Business
             Status = fs.Status,
             ApprovedByIngenieroId = fs.ApprovedByIngenieroId,
             ApprovedByIngenieroAt = fs.ApprovedByIngenieroAt,
+            // HSEQ Review fields
+            ReviewedByHSEQId = fs.ReviewedByHSEQId,
+            ReviewedByHSEQAt = fs.ReviewedByHSEQAt,
+            ObservationsByHSEQ = fs.ObservationsByHSEQ,
+            // Deprecated fields (mantener por compatibilidad)
             ApprovedBySupervisorId = fs.ApprovedBySupervisorId,
             ApprovedBySupervisorAt = fs.ApprovedBySupervisorAt,
             CreatedAt = fs.CreatedAt,

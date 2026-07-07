@@ -135,6 +135,21 @@ namespace AutoCheckAML.Api.Web.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        /// <summary>Registrar revisión del Supervisor HSEQ (no cambia estado del vehículo).</summary>
+        [HttpPut("{id}/hseq-review")]
+        [Authorize(Roles = "DEV,SOFTWARE,SUPERVISOR_HSEQ")]
+        public async Task<IActionResult> RegisterHSEQReview(int id, [FromBody] HSEQReviewRequest request)
+        {
+            try
+            {
+                var result = await _formService.RegisterHSEQReviewAsync(GetUserId(), id, request.Observations ?? "Sin observaciones");
+                return Ok(new { message = result });
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         /// <summary>
         /// Eliminar un formulario (solo DEV/SOFTWARE/Admin).
         /// </summary>
