@@ -199,6 +199,9 @@ using (var scope = app.Services.CreateScope())
     var adminUser = await dbContext.Users
         .FirstOrDefaultAsync(u => (u.Username.ToLower() == "admin" || u.Email == "admin@autocheck.com") && !u.IsDeleted);
 
+    // Verificar si se debe resetear las contraseñas (útil para primer despliegue)
+    var resetPasswords = Environment.GetEnvironmentVariable("RESET_DEFAULT_PASSWORDS")?.ToLower() == "true";
+
     if (adminUser == null)
     {
         adminUser = new AutoCheckAML.Api.Entity.User
@@ -219,9 +222,16 @@ using (var scope = app.Services.CreateScope())
         };
         dbContext.Users.Add(adminUser);
         await dbContext.SaveChangesAsync();
+        Console.WriteLine("Usuario Admin creado con contraseña configurada.");
     }
-    // NOTA: Si el usuario Admin ya existe, NO se modifica nada.
-    // Esto evita que los reinicios cambien el password establecido por el usuario.
+    else if (resetPasswords)
+    {
+        // Actualizar contraseña del admin si RESET_DEFAULT_PASSWORDS=true
+        adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+        adminUser.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+        Console.WriteLine("Contraseña de Admin actualizada.");
+    }
 
     // Ensure DEV role assignment exists
     var adminRole = await dbContext.UserRoles
@@ -240,7 +250,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     // Helper local para asegurar la existencia de usuarios de prueba
-    // Si YA EXISTE: no modifica nada (respeta password y datos actuales)
+    // Si YA EXISTE y RESET_DEFAULT_PASSWORDS=true: actualiza la contraseña
     // Si NO EXISTE: lo crea con username capitalizado (primera letra mayúscula)
     async Task EnsureTestUser(string username, string email, string password, string fullName, int roleId)
     {
@@ -265,9 +275,16 @@ using (var scope = app.Services.CreateScope())
             };
             dbContext.Users.Add(testUser);
             await dbContext.SaveChangesAsync();
+            Console.WriteLine($"Usuario {username} creado.");
         }
-        // NOTA: Si el usuario ya existe, NO se modifica nada.
-        // Esto evita que los reinicios cambien passwords o usernames establecidos por el usuario.
+        else if (resetPasswords)
+        {
+            // Actualizar contraseña si RESET_DEFAULT_PASSWORDS=true
+            testUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            testUser.UpdatedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+            Console.WriteLine($"Contraseña de {username} actualizada.");
+        }
 
         var testUserRole = await dbContext.UserRoles
             .FirstOrDefaultAsync(ur => ur.UserId == testUser.Id && ur.RoleId == roleId);
