@@ -1,6 +1,6 @@
 # ===========================================
 # Dockerfile - BackEnd (AutoCheckAML.Api)
-# .NET 10 Web API + SQLite
+# .NET 10 Web API + PostgreSQL (Supabase)
 # ===========================================
 
 # --- Etapa 1: Build / Publish ---
@@ -19,16 +19,13 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Crear carpeta de datos para SQLite y dar permisos
-RUN mkdir -p /app/data && chmod 777 /app/data
-
 # Copiar el publicado
 COPY --from=build /app/publish .
 
-# Puerto expuesto por la API
-EXPOSE 5000
-
-# Entorno
+# Render usa la variable PORT
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:${PORT:-5000}
+
+EXPOSE ${PORT:-5000}
 
 ENTRYPOINT ["dotnet", "AutoCheckAML.Api.dll"]
